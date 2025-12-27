@@ -1,6 +1,13 @@
 plugins {
     java
     application
+    jacoco // aggiunto plugin per la copertura del codice
+}
+
+
+
+jacoco {
+    toolVersion = "0.8.12"
 }
 
 dependencies {
@@ -33,6 +40,20 @@ application {
     mainClass.set("se.chalmers.ju2jmh.Converter")
 }
 
+// --- INIZIO BLOCCO DA COPIARE IN FONDO ---
+
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    // Usa il nome stringa per evitare errori se l'accessor non è pronto
+    finalizedBy("jacocoTestReport")
+}
+
+// Configurazione sicura del report JaCoCo
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.named("test")) // Esegue prima i test
+    reports {
+        xml.required.set(false)
+        csv.required.set(false)
+        html.required.set(true) // Genera HTML
+    }
 }

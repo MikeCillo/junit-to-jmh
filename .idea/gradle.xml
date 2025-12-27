@@ -12,6 +12,7 @@
             <option value="$PROJECT_DIR$/converter" />
             <option value="$PROJECT_DIR$/converter/test-input-classes" />
             <option value="$PROJECT_DIR$/experiments" />
+            <option value="$PROJECT_DIR$/regression_inputs" />
             <option value="$PROJECT_DIR$/samples" />
           </set>
         </option>
