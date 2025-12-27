@@ -2,6 +2,8 @@ plugins {
     java
     application
     jacoco // aggiunto plugin per la copertura del codice
+    id("info.solidsoft.pitest") version "1.15.0"
+
 }
 
 
@@ -9,6 +11,26 @@ plugins {
 jacoco {
     toolVersion = "0.8.12"
 }
+
+// --- Configurazione PITest (Mutation Testing) ---
+configure<info.solidsoft.gradle.pitest.PitestPluginExtension> {
+    // Usa il plugin per JUnit 5 (fondamentale per il tuo progetto)
+    junit5PluginVersion.set("1.2.1")
+
+    // Indica quali classi mutare (il tuo pacchetto base)
+    targetClasses.set(listOf("se.chalmers.ju2jmh.*"))
+
+    // Escludi i test stessi dalla mutazione (opzionale ma consigliato)
+    targetTests.set(listOf("se.chalmers.ju2jmh.*"))
+
+    // Ottimizzazioni
+    threads.set(4) // Usa 4 core per fare prima
+    outputFormats.set(listOf("HTML")) // Report leggibile
+    timestampedReports.set(false) // Sovrascrivi sempre lo stesso report
+    verbose.set(true)
+}
+
+
 
 dependencies {
     val javaparserVersion: String by rootProject.extra
