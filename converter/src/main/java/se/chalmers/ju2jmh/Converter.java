@@ -10,7 +10,7 @@ import se.chalmers.ju2jmh.api.JU2JmhBenchmark;
 import se.chalmers.ju2jmh.api.Rules;
 import se.chalmers.ju2jmh.api.ThrowingConsumer;
 import se.chalmers.ju2jmh.model.UnitTestClass;
-
+import com.github.javaparser.ParserConfiguration.LanguageLevel; //linguaggio
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -236,6 +236,7 @@ public class Converter implements Callable<Integer> {
     }
 
     public static void main(String[] args) {
+        StaticJavaParser.getConfiguration().setLanguageLevel(LanguageLevel.JAVA_17);
         int exitCode = new CommandLine(new Converter()).execute(args);
         System.exit(exitCode);
     }

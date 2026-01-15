@@ -12,6 +12,30 @@ jacoco {
     toolVersion = "0.8.12"
 }
 
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+
+subprojects {
+    // Applica il plugin Java per poter configurare la toolchain
+    apply(plugin = "java")
+
+    repositories {
+        mavenCentral()
+    }
+
+    // Configurazione globale per Java 17
+    configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
+    }
+}
+
 pitest {
     // Usa il plugin per JUnit 5
     junit5PluginVersion.set("1.2.1")
@@ -39,7 +63,8 @@ dependencies {
 
     implementation(project(":api"))
     implementation("info.picocli", "picocli", "4.6.3")
-    implementation("com.github.javaparser", "javaparser-core", javaparserVersion)
+   // implementation("com.github.javaparser", "javaparser-core", javaparserVersion)
+    implementation("com.github.javaparser", "javaparser-core", "3.25.10")
     implementation("org.openjdk.jmh", "jmh-core", jmhVersion)
     implementation("org.apache.bcel", "bcel", bcelVersion)
     implementation("junit", "junit", jUnit4Version)
