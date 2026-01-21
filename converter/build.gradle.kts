@@ -1,71 +1,51 @@
 plugins {
     java
     application
-    jacoco // aggiunto plugin per la copertura del codice
+    jacoco
     id("info.solidsoft.pitest") version "1.15.0"
-
 }
 
 
+repositories {
+    mavenLocal()    // Cerca in ~/.m2/repository (dove è AMBER)
+    mavenCentral()  // Poi cerca online
+}
 
 jacoco {
     toolVersion = "0.8.12"
 }
 
-
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
-
-
-subprojects {
-    // Applica il plugin Java per poter configurare la toolchain
-    apply(plugin = "java")
-
-    repositories {
-        mavenCentral()
-    }
-
-    // Configurazione globale per Java 17
-    configure<JavaPluginExtension> {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(17))
-        }
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
 
 pitest {
-    // Usa il plugin per JUnit 5
     junit5PluginVersion.set("1.2.1")
-
-    // Indica quali classi mutare
     targetClasses.set(listOf("se.chalmers.ju2jmh.*"))
-
-    // I test da eseguire
     targetTests.set(listOf("se.chalmers.ju2jmh.*"))
-
-    // Ottimizzazioni
     threads.set(4)
     outputFormats.set(listOf("HTML"))
     timestampedReports.set(false)
     verbose.set(true)
 }
 
-
 dependencies {
     val javaparserVersion: String by rootProject.extra
     val jUnitJupiterVersion: String by rootProject.extra
-    val jmhVersion: String by rootProject.extra
+    // val jmhVersion: String by rootProject.extra  <-- NON USIAMO PIÙ QUELLA STANDARD
+
     val bcelVersion: String by rootProject.extra
     val jUnit4Version: String by rootProject.extra
 
     implementation(project(":api"))
     implementation("info.picocli", "picocli", "4.6.3")
-   // implementation("com.github.javaparser", "javaparser-core", javaparserVersion)
     implementation("com.github.javaparser", "javaparser-core", "3.25.10")
-    implementation("org.openjdk.jmh", "jmh-core", jmhVersion)
+
+    // 3. MODIFICA CRUCIALE: Usiamo la versione di AMBER installata localmente
+    implementation("org.openjdk.jmh", "jmh-core", "1.37-AMBER")
+
     implementation("org.apache.bcel", "bcel", bcelVersion)
     implementation("junit", "junit", jUnit4Version)
     implementation("com.google.guava", "guava", "31.1-jre")
@@ -85,20 +65,16 @@ application {
     mainClass.set("se.chalmers.ju2jmh.Converter")
 }
 
-// --- INIZIO BLOCCO DA COPIARE IN FONDO ---
-
 tasks.named<Test>("test") {
     useJUnitPlatform()
-    // Usa il nome stringa per evitare errori se l'accessor non è pronto
     finalizedBy("jacocoTestReport")
 }
 
-// Configurazione sicura del report JaCoCo
 tasks.named<JacocoReport>("jacocoTestReport") {
-    dependsOn(tasks.named("test")) // Esegue prima i test
+    dependsOn(tasks.named("test"))
     reports {
         xml.required.set(false)
         csv.required.set(false)
-        html.required.set(true) // Genera HTML
+        html.required.set(true)
     }
 }
