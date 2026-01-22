@@ -8,7 +8,7 @@ plugins {
 
 repositories {
     mavenLocal()    // Cerca in ~/.m2/repository (dove è AMBER)
-    mavenCentral()  // Poi cerca online
+    mavenCentral()  // Poi cerca online AMBER
 }
 
 jacoco {
@@ -34,7 +34,7 @@ pitest {
 dependencies {
     val javaparserVersion: String by rootProject.extra
     val jUnitJupiterVersion: String by rootProject.extra
-    // val jmhVersion: String by rootProject.extra  <-- NON USIAMO PIÙ QUELLA STANDARD
+    // val jmhVersion: String by rootProject.extra non usata
 
     val bcelVersion: String by rootProject.extra
     val jUnit4Version: String by rootProject.extra
@@ -43,8 +43,9 @@ dependencies {
     implementation("info.picocli", "picocli", "4.6.3")
     implementation("com.github.javaparser", "javaparser-core", "3.25.10")
 
-    // 3. MODIFICA CRUCIALE: Usiamo la versione di AMBER installata localmente
-    implementation("org.openjdk.jmh", "jmh-core", "1.37-AMBER")
+    // AMBER LOCALE
+    //implementation("org.openjdk.jmh", "jmh-core", "1.37-AMBER")
+    implementation(files("libs/jmh-core-1.37-all.jar")) // libreria di JMH con AMBER
 
     implementation("org.apache.bcel", "bcel", bcelVersion)
     implementation("junit", "junit", jUnit4Version)

@@ -56,6 +56,11 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class NestedBenchmarkSuiteBuilder {
+    private List<String> targetMethods = null;
+
+    public void setTargetMethods(List<String> targetMethods) {
+        this.targetMethods = targetMethods;
+    }
     private static final ClassOrInterfaceDeclaration BENCHMARK_CLASS_TEMPLATE =
             AstTemplates.type("templates/nested_benchmark/benchmark_class_template.java")
                     .asClassOrInterfaceDeclaration();
@@ -161,7 +166,15 @@ public class NestedBenchmarkSuiteBuilder {
                 AstTemplates.method("templates/nested_benchmark/benchmark_method_template.java");
         private static final MethodDeclaration EXCEPTION_BENCHMARK_METHOD = AstTemplates.method(
                 "templates/nested_benchmark/exception_benchmark_method_template.java");
+        private final List<String> allowedMethods;
 
+        public BenchmarkTemplateModifier(List<String> allowedMethods) {
+            this.allowedMethods = allowedMethods;
+        }
+
+        public BenchmarkTemplateModifier() {
+            this(null);
+        }
         @Override
         public Visitable visit(ClassOrInterfaceType n, InputClass arg) {
             if (n.getNameAsString().equals("IMPLEMENTATION_CLASS_NAME")) {
@@ -390,6 +403,7 @@ public class NestedBenchmarkSuiteBuilder {
                     .filter(Bytecode.Predicates.isMethodAnnotated(Test.class))
                     .filter(Predicate.not(
                             Bytecode.Predicates.isMethodAnnotated(Ignore.class)))
+                    .filter(m -> allowedMethods == null || allowedMethods.contains(m.getName()))
                     .map(BenchmarkTemplateModifier::generateBenchmarkMethod);
         }
 
@@ -567,7 +581,7 @@ public class NestedBenchmarkSuiteBuilder {
             if (abstractBenchmarkClasses.containsKey(testClassName)) {
                 benchmarkClass.setAbstract(true);
             }
-            benchmarkClass.accept(new BenchmarkTemplateModifier(), testInputClass);
+            benchmarkClass.accept(new BenchmarkTemplateModifier(targetMethods), testInputClass);
             enclosing.addMember(benchmarkClass);
         }
         return Collections.unmodifiableMap(compilationUnits);
