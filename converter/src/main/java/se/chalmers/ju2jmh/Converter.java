@@ -72,6 +72,13 @@ public class Converter implements Callable<Integer> {
             description = "File to load class names from.")
     private Path classNamesFile;
 
+    @CommandLine.Option(
+            names = {"-m", "--methods"},
+            description = "Specific methods to convert (comma separated). If omitted, all tests are converted.",
+            split = ","
+    )
+    private List<String> targetMethods;
+
     private static CompilationUnit loadApiSource(Class<?> apiClass) throws IOException {
         return StaticJavaParser.parseResource(
                 apiClass.getCanonicalName().replace('.', '/') + ".java");
@@ -90,6 +97,9 @@ public class Converter implements Callable<Integer> {
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
+        if (targetMethods != null && !targetMethods.isEmpty()) {
+            benchmarkSuiteBuilder.setTargetMethods(targetMethods);
+        }
         for (String className : classNames) {
             benchmarkSuiteBuilder.addTestClass(className);
         }

@@ -1,6 +1,15 @@
 plugins {
     java
+    `java-library`
 }
+
+java {
+    toolchain {
+        // FORZIAMO JAVA 17 ANCHE QUI
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
 
 dependencies {
     val jUnitJupiterVersion: String by rootProject.extra
