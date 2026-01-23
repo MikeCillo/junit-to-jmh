@@ -44,7 +44,7 @@ dependencies {
     implementation("com.github.javaparser", "javaparser-core", "3.25.10")
 
     // 3. MODIFICA CRUCIALE: Usiamo la versione di AMBER installata localmente
-    implementation("org.openjdk.jmh", "jmh-core", "1.37-AMBER")
+    implementation("org.openjdk.jmh:jmh-core:1.37")
 
     implementation("org.apache.bcel", "bcel", bcelVersion)
     implementation("junit", "junit", jUnit4Version)
