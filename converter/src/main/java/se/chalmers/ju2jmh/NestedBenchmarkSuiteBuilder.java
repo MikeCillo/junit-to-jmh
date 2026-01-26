@@ -55,6 +55,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+//aggiunte annotazioni JUnit 5
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
+
 public class NestedBenchmarkSuiteBuilder {
     private List<String> targetMethods = null;
 
@@ -88,6 +94,7 @@ public class NestedBenchmarkSuiteBuilder {
                 .filter(AccessFlags::isPublic)
                 .filter(Bytecode.Predicates.hasArgCount(0))
                 .anyMatch(Bytecode.Predicates.isMethodAnnotated(Test.class)
+                        .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class)) // JUNIT 5
                         .or(Bytecode.Predicates.isMethodAnnotated(Before.class))
                         .or(Bytecode.Predicates.isMethodAnnotated(After.class))
                         .or(Bytecode.Predicates.isMethodAnnotated(BeforeClass.class))
@@ -218,21 +225,28 @@ public class NestedBenchmarkSuiteBuilder {
             FIRST, LAST
         }
 
+        // MODIFICA CR-01 annotazioni per JUnit 4 e JUnit 5
         private static MethodDeclaration populateFixtureMethod(MethodDeclaration method,
-                InputClass arg, Class<? extends Annotation> annotation, MemberType methodType,
-                SuperCallOrder callSuper) {
+                                                               InputClass arg,
+                                                               Class<? extends Annotation> annotation,
+                                                               Class<? extends Annotation> modernAnnotation,
+                                                               MemberType methodType,
+                                                               SuperCallOrder callSuper) {
+
             BlockStmt body = method.getBody().orElseThrow();
             Statement superCall = callSuper == SuperCallOrder.LAST
                     ? body.getStatements().remove(0)
                     : null;
+
+            Predicate<Method> isAnnotated = Bytecode.Predicates.isMethodAnnotated(annotation)
+                    .or(Bytecode.Predicates.isMethodAnnotated(modernAnnotation));
+
             switch (methodType) {
                 case STATIC_METHOD:
-                    staticMethodCalls(Bytecode.Predicates.isMethodAnnotated(annotation), arg)
-                            .forEach(body::addStatement);
+                    staticMethodCalls(isAnnotated, arg).forEach(body::addStatement);
                     break;
                 case INSTANCE_METHOD:
-                    instanceMethodCalls(Bytecode.Predicates.isMethodAnnotated(annotation), arg)
-                            .forEach(body::addStatement);
+                    instanceMethodCalls(isAnnotated, arg).forEach(body::addStatement);
                     break;
                 default:
                     throw new AssertionError(
@@ -311,21 +325,26 @@ public class NestedBenchmarkSuiteBuilder {
             }
         }
 
+        // ANNOTAZIONI PER JUNIT 4 E JUNIT 5
         @Override
         public Visitable visit(MethodDeclaration n, InputClass arg) {
             switch (n.getNameAsString()) {
                 case "beforeClass":
-                    return populateFixtureMethod(n, arg, BeforeClass.class,
+                    // @BeforeClass JU4  @BeforeAll JU5
+                    return populateFixtureMethod(n, arg, BeforeClass.class, BeforeAll.class,
                             MemberType.STATIC_METHOD, SuperCallOrder.FIRST);
                 case "afterClass":
-                    return populateFixtureMethod(n, arg, AfterClass.class, MemberType.STATIC_METHOD,
-                            SuperCallOrder.LAST);
+                    //  @AfterClass JU4 o @AfterAll JU5
+                    return populateFixtureMethod(n, arg, AfterClass.class, AfterAll.class,
+                            MemberType.STATIC_METHOD, SuperCallOrder.LAST);
                 case "before":
-                    return populateFixtureMethod(n, arg, Before.class, MemberType.INSTANCE_METHOD,
-                            SuperCallOrder.FIRST);
+                    // @Before JU4 o @BeforeEach JU5
+                    return populateFixtureMethod(n, arg, Before.class, BeforeEach.class,
+                            MemberType.INSTANCE_METHOD, SuperCallOrder.FIRST);
                 case "after":
-                    return populateFixtureMethod(n, arg, After.class, MemberType.INSTANCE_METHOD,
-                            SuperCallOrder.LAST);
+                    // @After JU4 o @AfterEach JU5
+                    return populateFixtureMethod(n, arg, After.class, AfterEach.class,
+                            MemberType.INSTANCE_METHOD, SuperCallOrder.LAST);
                 case "applyClassRuleFields":
                     return populateApplyRulesMethod(n, arg, MemberType.STATIC_FIELD);
                 case "applyClassRuleMethods":
@@ -400,7 +419,9 @@ public class NestedBenchmarkSuiteBuilder {
                     .filter(AccessFlags::isPublic)
                     .filter(Predicate.not(AccessFlags::isStatic))
                     .filter(Bytecode.Predicates.hasArgCount(0))
-                    .filter(Bytecode.Predicates.isMethodAnnotated(Test.class))
+                    // MODIFICA CR-01: Accetta sia JUnit 4 che JUnit 5
+                    .filter(Bytecode.Predicates.isMethodAnnotated(Test.class)
+                            .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class))) //JUNIT 5
                     .filter(Predicate.not(
                             Bytecode.Predicates.isMethodAnnotated(Ignore.class)))
                     .filter(m -> allowedMethods == null || allowedMethods.contains(m.getName()))

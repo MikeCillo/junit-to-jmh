@@ -26,6 +26,9 @@ public class JU4BenchmarkFactory {
     private static final MethodDeclaration METHOD_TEMPLATE =
             AstTemplates.method("templates/ju4_benchmark/method_template.java");
     private static final String J_UNIT_4_TEST_ANNOTATION = "Lorg/junit/Test;";
+    //aggiunto per supporto A JUnit 5
+    private static final String J_UNIT_5_TEST_ANNOTATION = "Lorg/junit/jupiter/api/Test;";
+
     private static final String TEST_CLASS_PLACEHOLDER = "TEST_CLASS";
     private static final String TEST_METHOD_NAME_PLACEHOLDER = "TEST_METHOD_NAME";
     private final InputClassRepository repository;
@@ -44,7 +47,8 @@ public class JU4BenchmarkFactory {
 
     private static Predicate<Method> isJUnit4Test() {
         return m -> Arrays.stream(m.getAnnotationEntries())
-                .anyMatch(a -> a.getAnnotationType().equals(J_UNIT_4_TEST_ANNOTATION));
+                .anyMatch(a -> a.getAnnotationType().equals(J_UNIT_4_TEST_ANNOTATION)
+                        || a.getAnnotationType().equals(J_UNIT_5_TEST_ANNOTATION));
     }
 
     private Stream<String> findTestMethods(JavaClass bytecode) {

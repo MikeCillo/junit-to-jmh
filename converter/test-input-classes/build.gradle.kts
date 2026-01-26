@@ -11,6 +11,9 @@ dependencies {
     val jUnit4Version: String by rootProject.extra
 
     compileOnly("junit", "junit", jUnit4Version)
+    //dipendenza necessaria per eseguire i test con JUnit 5
+    implementation("org.junit.jupiter:junit-jupiter:5.10.0")
+
 }
 
 tasks.register<Copy>("copySourcesToResources") {

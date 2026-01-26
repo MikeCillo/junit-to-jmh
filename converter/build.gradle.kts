@@ -51,7 +51,7 @@ dependencies {
     implementation("com.google.guava", "guava", "31.1-jre")
     implementation("org.freemarker", "freemarker", "2.3.31")
     implementation("commons-io", "commons-io", "2.11.0")
-
+    implementation("org.junit.jupiter:junit-jupiter:5.10.0") // aggiunta per eseguire i test con JUnit 5
     testImplementation("org.junit.jupiter", "junit-jupiter-api", jUnitJupiterVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-params", jUnitJupiterVersion)
     testImplementation("org.hamcrest", "hamcrest-library", "2.2")
