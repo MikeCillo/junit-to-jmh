@@ -94,7 +94,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
-    private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
+   /* private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
         if (targetMethods != null && !targetMethods.isEmpty()) {
@@ -115,6 +115,59 @@ public class Converter implements Callable<Integer> {
                 outputPath.resolve(
                         JU2JmhBenchmark.class.getCanonicalName()
                                 .replace('.', File.separatorChar) + ".java")
+                        .toFile());
+    }*/
+
+
+    private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
+        NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
+                new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
+
+        // MODIFICA CR-03: Supporto Granularità (Sintassi ClassName#MethodName)
+        List<String> effectiveClassNames = new ArrayList<>();
+        List<String> effectiveTargetMethods = new ArrayList<>();
+
+        // 1. Se l'utente ha usato anche il flag -m, copiamo quei metodi
+        if (targetMethods != null) {
+            effectiveTargetMethods.addAll(targetMethods);
+        }
+
+        // 2. Analizziamo gli argomenti posizionali
+        for (String input : classNames) {
+            if (input.contains("#")) {
+                // Sintassi trovata: "Package.Classe#Metodo"
+                String[] parts = input.split("#");
+                effectiveClassNames.add(parts[0]); // Aggiungi la Classe
+                effectiveTargetMethods.add(parts[1]); // Aggiungi il Metodo al filtro
+            } else {
+                // Sintassi classica: solo Classe
+                effectiveClassNames.add(input);
+            }
+        }
+
+        // 3. Passiamo la lista dei metodi al Builder (se non è vuota)
+        if (!effectiveTargetMethods.isEmpty()) {
+            benchmarkSuiteBuilder.setTargetMethods(effectiveTargetMethods);
+        }
+
+        // 4. Aggiungiamo le classi pulite al Builder
+        for (String className : effectiveClassNames) {
+            benchmarkSuiteBuilder.addTestClass(className);
+        }
+
+        // ... resto del codice originale per la scrittura su file ...
+        Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
+        for (String className : suite.keySet()) {
+            File outputFile =
+                    outputPath.resolve(className.replace('.', File.separatorChar) + ".java")
+                            .toFile();
+            writeSourceCodeToFile(suite.get(className), outputFile);
+        }
+        writeSourceCodeToFile(
+                loadApiSource(JU2JmhBenchmark.class),
+                outputPath.resolve(
+                                JU2JmhBenchmark.class.getCanonicalName()
+                                        .replace('.', File.separatorChar) + ".java")
                         .toFile());
     }
 
