@@ -123,39 +123,25 @@ public class Converter implements Callable<Integer> {
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
 
-        // MODIFICA CR-03:
-        List<String> effectiveClassNames = new ArrayList<>();
+        // Lista dei metodi da convertire
         List<String> effectiveTargetMethods = new ArrayList<>();
 
-        // 1. Se l'utente ha usato anche il flag -m aggiungiamo i metodi specificati
+        // Se è stato usato il flag -m aggiungiamo i metodi alla lista
         if (targetMethods != null) {
             effectiveTargetMethods.addAll(targetMethods);
         }
 
-        // 2. Analizziamo gli argomenti posizionali
-        for (String input : classNames) {
-            if (input.contains("#")) {
-
-                String[] parts = input.split("#");
-                effectiveClassNames.add(parts[0]); // Aggiungi la Classe
-                effectiveTargetMethods.add(parts[1]); // Aggiungi il Metodo al filtro
-            } else {
-                // Sintassi classica: solo Classe
-                effectiveClassNames.add(input);
-            }
-        }
-
-        // 3 metodi passati al builder
+        // 2. aggiunta metodi
         if (!effectiveTargetMethods.isEmpty()) {
             benchmarkSuiteBuilder.setTargetMethods(effectiveTargetMethods);
         }
 
-        // 4 aggiunta classi al builder
-        for (String className : effectiveClassNames) {
+        // 3 Aggiunta classi
+        for (String className : classNames) {
             benchmarkSuiteBuilder.addTestClass(className);
         }
 
-       // scrittura su file ...
+        // scrittura file
         Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
         for (String className : suite.keySet()) {
             File outputFile =
