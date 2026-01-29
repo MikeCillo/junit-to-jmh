@@ -123,11 +123,11 @@ public class Converter implements Callable<Integer> {
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
 
-        // MODIFICA CR-03: Supporto Granularità (Sintassi ClassName#MethodName)
+        // MODIFICA CR-03:
         List<String> effectiveClassNames = new ArrayList<>();
         List<String> effectiveTargetMethods = new ArrayList<>();
 
-        // 1. Se l'utente ha usato anche il flag -m, copiamo quei metodi
+        // 1. Se l'utente ha usato anche il flag -m aggiungiamo i metodi specificati
         if (targetMethods != null) {
             effectiveTargetMethods.addAll(targetMethods);
         }
@@ -135,7 +135,7 @@ public class Converter implements Callable<Integer> {
         // 2. Analizziamo gli argomenti posizionali
         for (String input : classNames) {
             if (input.contains("#")) {
-                // Sintassi trovata: "Package.Classe#Metodo"
+
                 String[] parts = input.split("#");
                 effectiveClassNames.add(parts[0]); // Aggiungi la Classe
                 effectiveTargetMethods.add(parts[1]); // Aggiungi il Metodo al filtro
@@ -145,17 +145,17 @@ public class Converter implements Callable<Integer> {
             }
         }
 
-        // 3. Passiamo la lista dei metodi al Builder (se non è vuota)
+        // 3 metodi passati al builder
         if (!effectiveTargetMethods.isEmpty()) {
             benchmarkSuiteBuilder.setTargetMethods(effectiveTargetMethods);
         }
 
-        // 4. Aggiungiamo le classi pulite al Builder
+        // 4 aggiunta classi al builder
         for (String className : effectiveClassNames) {
             benchmarkSuiteBuilder.addTestClass(className);
         }
 
-        // ... resto del codice originale per la scrittura su file ...
+       // scrittura su file ...
         Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
         for (String className : suite.keySet()) {
             File outputFile =
