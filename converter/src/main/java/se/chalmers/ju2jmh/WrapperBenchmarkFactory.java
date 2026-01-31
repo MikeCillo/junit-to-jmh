@@ -20,7 +20,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class JU4BenchmarkFactory {
+public class WrapperBenchmarkFactory {
     private static final CompilationUnit CLASS_TEMPLATE =
             AstTemplates.compilationUnit("templates/ju4_benchmark/class_template.java");
     private static final MethodDeclaration METHOD_TEMPLATE =
@@ -33,7 +33,7 @@ public class JU4BenchmarkFactory {
     private static final String TEST_METHOD_NAME_PLACEHOLDER = "TEST_METHOD_NAME";
     private final InputClassRepository repository;
 
-    public JU4BenchmarkFactory(InputClassRepository repository) {
+    public WrapperBenchmarkFactory(InputClassRepository repository) {
         this.repository = repository;
     }
 

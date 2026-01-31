@@ -161,7 +161,7 @@ public class Converter implements Callable<Integer> {
             throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository =
                 new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
-        JU4BenchmarkFactory benchmarkFactory = new JU4BenchmarkFactory(repository);
+        WrapperBenchmarkFactory benchmarkFactory = new WrapperBenchmarkFactory(repository);
         List<CompilationUnit> benchmarks = new ArrayList<>(classNames.size());
         for (String className : classNames) {
             try {
