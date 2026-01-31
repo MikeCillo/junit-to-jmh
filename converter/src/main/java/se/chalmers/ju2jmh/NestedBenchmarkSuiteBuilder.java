@@ -328,23 +328,23 @@ public class NestedBenchmarkSuiteBuilder {
         // ANNOTAZIONI PER JUNIT 4 E JUNIT 5
         @Override
         public Visitable visit(MethodDeclaration n, InputClass arg) {
-            switch (n.getNameAsString()) {
-                case "beforeClass":
-                    // @BeforeClass JU4  @BeforeAll JU5
-                    return populateFixtureMethod(n, arg, BeforeClass.class, BeforeAll.class,
-                            MemberType.STATIC_METHOD, SuperCallOrder.FIRST);
-                case "afterClass":
-                    //  @AfterClass JU4 o @AfterAll JU5
-                    return populateFixtureMethod(n, arg, AfterClass.class, AfterAll.class,
-                            MemberType.STATIC_METHOD, SuperCallOrder.LAST);
-                case "before":
-                    // @Before JU4 o @BeforeEach JU5
-                    return populateFixtureMethod(n, arg, Before.class, BeforeEach.class,
-                            MemberType.INSTANCE_METHOD, SuperCallOrder.FIRST);
-                case "after":
-                    // @After JU4 o @AfterEach JU5
-                    return populateFixtureMethod(n, arg, After.class, AfterEach.class,
-                            MemberType.INSTANCE_METHOD, SuperCallOrder.LAST);
+                switch (n.getNameAsString()) {
+                    case "beforeClass":
+                        // Passiamo SIA @BeforeClass (J4) SIA @BeforeAll (J5)
+                        return populateFixtureMethod(n, arg, BeforeClass.class, org.junit.jupiter.api.BeforeAll.class,
+                                MemberType.STATIC_METHOD, SuperCallOrder.FIRST);
+                    case "afterClass":
+                        // Passiamo SIA @AfterClass (J4) SIA @AfterAll (J5)
+                        return populateFixtureMethod(n, arg, AfterClass.class, org.junit.jupiter.api.AfterAll.class,
+                                MemberType.STATIC_METHOD, SuperCallOrder.LAST);
+                    case "before":
+                        // Passi DUE classi: Before.class E BeforeEach.class
+                        return populateFixtureMethod(n, arg, Before.class, BeforeEach.class,
+                                MemberType.INSTANCE_METHOD, SuperCallOrder.FIRST);
+                    case "after":
+                        // Passiamo SIA @After (J4) SIA @AfterEach (J5)
+                        return populateFixtureMethod(n, arg, After.class, org.junit.jupiter.api.AfterEach.class,
+                                MemberType.INSTANCE_METHOD, SuperCallOrder.LAST);
                 case "applyClassRuleFields":
                     return populateApplyRulesMethod(n, arg, MemberType.STATIC_FIELD);
                 case "applyClassRuleMethods":
@@ -419,11 +419,13 @@ public class NestedBenchmarkSuiteBuilder {
                     .filter(AccessFlags::isPublic)
                     .filter(Predicate.not(AccessFlags::isStatic))
                     .filter(Bytecode.Predicates.hasArgCount(0))
-                    // MODIFICA CR-01: Accetta sia JUnit 4 che JUnit 5
+                    // MODIFICA CR-01: Accetta sia JUnit 4 che JUnit 5 per i test
                     .filter(Bytecode.Predicates.isMethodAnnotated(Test.class)
-                            .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class))) //JUNIT 5
+                            .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class)))
+                    // MODIFICA CR-01: Ignora sia @Ignore JUnit4 @Disabled JUnit5
                     .filter(Predicate.not(
-                            Bytecode.Predicates.isMethodAnnotated(Ignore.class)))
+                            Bytecode.Predicates.isMethodAnnotated(Ignore.class)
+                                    .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Disabled.class))))
                     .filter(m -> allowedMethods == null || allowedMethods.contains(m.getName()))
                     .map(BenchmarkTemplateModifier::generateBenchmarkMethod);
         }
