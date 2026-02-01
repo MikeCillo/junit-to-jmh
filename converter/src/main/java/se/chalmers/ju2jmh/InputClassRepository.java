@@ -57,13 +57,20 @@ public class InputClassRepository {
                 .findFirst();
     }
 
+    // In InputClassRepository.java
+
     private Path findBytecodeFile(String name) throws ClassNotFoundException {
         String bytecodeFileName = name.replace('.', File.separatorChar) + ".class";
-        return findFirstExisting(classPath, bytecodeFileName)
-                .orElseThrow(() ->
-                        new ClassNotFoundException("Found no bytecode for class " + name));
-    }
 
+        // Ciclo esplicito: se il file c'è, lo restituiamo SUBITO.
+        for (Path root : classPath) {
+            Path fullPath = root.resolve(bytecodeFileName);
+            if (fullPath.toFile().exists()) {
+                return fullPath;
+            }
+        }
+        throw new ClassNotFoundException("Found no bytecode for class " + name);
+    }
     private Path findSourceFile(String name) throws ClassNotFoundException {
         String sourceFileName = ClassNames.outermostClassName(name)
                 .replace('.', File.separatorChar) + ".java";

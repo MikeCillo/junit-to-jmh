@@ -38,6 +38,12 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
+// IMPORT JUNIT 5
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
+
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.nio.file.Path;
@@ -55,18 +61,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-//aggiunte annotazioni JUnit 5
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.AfterAll;
-
 public class NestedBenchmarkSuiteBuilder {
     private List<String> targetMethods = null;
 
     public void setTargetMethods(List<String> targetMethods) {
         this.targetMethods = targetMethods;
     }
+
     private static final ClassOrInterfaceDeclaration BENCHMARK_CLASS_TEMPLATE =
             AstTemplates.type("templates/nested_benchmark/benchmark_class_template.java")
                     .asClassOrInterfaceDeclaration();
@@ -87,23 +88,37 @@ public class NestedBenchmarkSuiteBuilder {
 
     private boolean isTestClass(InputClass inputClass) {
         JavaClass bytecode = inputClass.getBytecode();
+
         if (bytecode.isInterface() || bytecode.isEnum() || bytecode.isAnnotation()) {
             return false;
         }
+
+        // Logica "manuale" che ha funzionato nel debug, ma senza le stampe.
+        // Questo ciclo controlla metodo per metodo.
         boolean hasTestMethods = Arrays.stream(bytecode.getMethods())
                 .filter(AccessFlags::isPublic)
                 .filter(Bytecode.Predicates.hasArgCount(0))
-                .anyMatch(Bytecode.Predicates.isMethodAnnotated(Test.class)
-                        .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class)) // JUNIT 5
-                        .or(Bytecode.Predicates.isMethodAnnotated(Before.class))
-                        .or(Bytecode.Predicates.isMethodAnnotated(After.class))
-                        .or(Bytecode.Predicates.isMethodAnnotated(BeforeClass.class))
-                        .or(Bytecode.Predicates.isMethodAnnotated(AfterClass.class))
-                        .or(Bytecode.Predicates.isMethodAnnotated(Rule.class))
-                        .or(Bytecode.Predicates.isMethodAnnotated(ClassRule.class)));
+                .anyMatch(m -> {
+                    boolean match = Bytecode.Predicates.isMethodAnnotated(Test.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(Before.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(After.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(BeforeClass.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(AfterClass.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(Rule.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(ClassRule.class).test(m)
+                            // JUnit 5 Lifecycle
+                            || Bytecode.Predicates.isMethodAnnotated(BeforeAll.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(AfterAll.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(BeforeEach.class).test(m)
+                            || Bytecode.Predicates.isMethodAnnotated(AfterEach.class).test(m);
+                    return match;
+                });
+
         if (hasTestMethods) {
             return true;
         }
+
         return Arrays.stream(bytecode.getFields())
                 .filter(AccessFlags::isPublic)
                 .anyMatch(Bytecode.Predicates.isFieldAnnotated(Rule.class)
@@ -120,16 +135,13 @@ public class NestedBenchmarkSuiteBuilder {
         try {
             addAbstractTestClass(superclassName);
         } catch (ClassNotFoundException e) {
-            // Superclass is unavailable. Assume it is a non-test class and continue.
         }
         if (!benchmarkClasses.containsKey(superclassName)
                 && !abstractBenchmarkClasses.containsKey(superclassName)) {
-            // Superclass is not test class, so check if this one should be added.
             if (isTestClass(inputClass)) {
                 abstractBenchmarkClasses.put(className, inputClass);
             }
         } else {
-            // Superclass is test class, so add regardless.
             abstractBenchmarkClasses.put(className, inputClass);
         }
     }
@@ -173,6 +185,7 @@ public class NestedBenchmarkSuiteBuilder {
                 AstTemplates.method("templates/nested_benchmark/benchmark_method_template.java");
         private static final MethodDeclaration EXCEPTION_BENCHMARK_METHOD = AstTemplates.method(
                 "templates/nested_benchmark/exception_benchmark_method_template.java");
+
         private final List<String> allowedMethods;
 
         public BenchmarkTemplateModifier(List<String> allowedMethods) {
@@ -182,6 +195,7 @@ public class NestedBenchmarkSuiteBuilder {
         public BenchmarkTemplateModifier() {
             this(null);
         }
+
         @Override
         public Visitable visit(ClassOrInterfaceType n, InputClass arg) {
             if (n.getNameAsString().equals("IMPLEMENTATION_CLASS_NAME")) {
@@ -196,7 +210,7 @@ public class NestedBenchmarkSuiteBuilder {
         }
 
         private static Stream<MethodCallExpr> instanceMethodCalls(Predicate<Method> filter,
-                InputClass inputClass) {
+                                                                  InputClass inputClass) {
             return Arrays.stream(inputClass.getBytecode().getMethods())
                     .filter(AccessFlags::isPublic)
                     .filter(Predicate.not(AccessFlags::isStatic))
@@ -207,7 +221,7 @@ public class NestedBenchmarkSuiteBuilder {
         }
 
         private static Stream<MethodCallExpr> staticMethodCalls(Predicate<Method> filter,
-                InputClass inputClass) {
+                                                                InputClass inputClass) {
             return Arrays.stream(inputClass.getBytecode().getMethods())
                     .filter(AccessFlags::isPublic)
                     .filter(AccessFlags::isStatic)
@@ -225,7 +239,6 @@ public class NestedBenchmarkSuiteBuilder {
             FIRST, LAST
         }
 
-        // MODIFICA CR-01 annotazioni per JUnit 4 e JUnit 5
         private static MethodDeclaration populateFixtureMethod(MethodDeclaration method,
                                                                InputClass arg,
                                                                Class<? extends Annotation> annotation,
@@ -288,7 +301,7 @@ public class NestedBenchmarkSuiteBuilder {
         }
 
         public static MethodDeclaration populateApplyRulesMethod(MethodDeclaration apply,
-                InputClass arg, MemberType memberType) {
+                                                                 InputClass arg, MemberType memberType) {
             BlockStmt body = apply.getBody().orElseThrow();
             Statement superCall = body.getStatement(0);
             Statement returnStatement = body.getStatement(1);
@@ -325,26 +338,22 @@ public class NestedBenchmarkSuiteBuilder {
             }
         }
 
-        // ANNOTAZIONI PER JUNIT 4 E JUNIT 5
         @Override
         public Visitable visit(MethodDeclaration n, InputClass arg) {
-                switch (n.getNameAsString()) {
-                    case "beforeClass":
-                        // Passiamo SIA @BeforeClass (J4) SIA @BeforeAll (J5)
-                        return populateFixtureMethod(n, arg, BeforeClass.class, org.junit.jupiter.api.BeforeAll.class,
-                                MemberType.STATIC_METHOD, SuperCallOrder.FIRST);
-                    case "afterClass":
-                        // Passiamo SIA @AfterClass (J4) SIA @AfterAll (J5)
-                        return populateFixtureMethod(n, arg, AfterClass.class, org.junit.jupiter.api.AfterAll.class,
-                                MemberType.STATIC_METHOD, SuperCallOrder.LAST);
-                    case "before":
-                        // Passi DUE classi: Before.class E BeforeEach.class
-                        return populateFixtureMethod(n, arg, Before.class, BeforeEach.class,
-                                MemberType.INSTANCE_METHOD, SuperCallOrder.FIRST);
-                    case "after":
-                        // Passiamo SIA @After (J4) SIA @AfterEach (J5)
-                        return populateFixtureMethod(n, arg, After.class, org.junit.jupiter.api.AfterEach.class,
-                                MemberType.INSTANCE_METHOD, SuperCallOrder.LAST);
+            switch (n.getNameAsString()) {
+                case "beforeClass":
+                    return populateFixtureMethod(n, arg, BeforeClass.class, BeforeAll.class,
+                            MemberType.STATIC_METHOD, SuperCallOrder.FIRST);
+                case "afterClass":
+                    return populateFixtureMethod(n, arg, AfterClass.class, AfterAll.class,
+                            MemberType.STATIC_METHOD, SuperCallOrder.LAST);
+                case "before":
+                    return populateFixtureMethod(n, arg, Before.class, BeforeEach.class,
+                            MemberType.INSTANCE_METHOD, SuperCallOrder.FIRST);
+                case "after":
+                    return populateFixtureMethod(n, arg, After.class, AfterEach.class,
+                            MemberType.INSTANCE_METHOD, SuperCallOrder.LAST);
+
                 case "applyClassRuleFields":
                     return populateApplyRulesMethod(n, arg, MemberType.STATIC_FIELD);
                 case "applyClassRuleMethods":
@@ -414,37 +423,28 @@ public class NestedBenchmarkSuiteBuilder {
             return benchmarkMethod;
         }
 
-
         private Stream<MethodDeclaration> generateBenchmarkMethods(InputClass arg) {
             return Arrays.stream(arg.getBytecode().getMethods())
                     .filter(AccessFlags::isPublic)
                     .filter(Predicate.not(AccessFlags::isStatic))
                     .filter(Bytecode.Predicates.hasArgCount(0))
-
-                    // JUnit 4 o 5
-                    .filter(Bytecode.Predicates.isMethodAnnotated(Test.class)
-                            .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class)))
-
-                    // Ignora Disabled/Ignore
-                    .filter(Predicate.not(
-                            Bytecode.Predicates.isMethodAnnotated(Ignore.class)
-                                    .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Disabled.class))))
-
-                    // --- FIX CR-03: LOGICA ESPLICITA ---
+                    // CHECK JUNIT 4 e 5
+                    .filter(m ->
+                            Bytecode.Predicates.isMethodAnnotated(Test.class).test(m)
+                                    || Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class).test(m)
+                    )
+                    // IGNORE
+                    .filter(m -> !(
+                            Bytecode.Predicates.isMethodAnnotated(Ignore.class).test(m)
+                                    || Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Disabled.class).test(m)
+                    ))
+                    // LIST FILTER
                     .filter(m -> {
-                        // Caso 1: allowedMethods è NULL -> Prendi tutto (comportamento di default)
-                        if (allowedMethods == null) {
+                        if (allowedMethods == null || allowedMethods.isEmpty()) {
                             return true;
                         }
-                        // Caso 2: allowedMethods è VUOTA -> Prendi tutto (nessuna selezione specifica fatta)
-                        if (allowedMethods.isEmpty()) {
-                            return true;
-                        }
-                        // Caso 3: C'è una lista -> Controlla se il metodo è presente
                         return allowedMethods.contains(m.getName());
                     })
-                    // ------------------------------------
-
                     .map(BenchmarkTemplateModifier::generateBenchmarkMethod);
         }
 
@@ -458,7 +458,7 @@ public class NestedBenchmarkSuiteBuilder {
     }
 
     private void loadOutputCompilationUnits(Map<String, CompilationUnit> compilationUnits,
-            File directory, String packageName) throws ClassNotFoundException {
+                                            File directory, String packageName) throws ClassNotFoundException {
         File[] files = directory.listFiles();
         if (files == null) {
             return;
@@ -506,7 +506,7 @@ public class NestedBenchmarkSuiteBuilder {
     }
 
     private TypeDeclaration<?> findTypeInCompilationUnit(String className,
-            CompilationUnit compilationUnit) throws ClassNotFoundException {
+                                                         CompilationUnit compilationUnit) throws ClassNotFoundException {
         String shortClassName = ClassNames.shortClassName(className);
         String outermostClassName = ClassNames.outermostClassName(shortClassName);
         TypeDeclaration<?> outermostType = compilationUnit.getTypes()
