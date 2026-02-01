@@ -45,7 +45,7 @@ public class WrapperBenchmarkFactory {
         return METHOD_TEMPLATE.clone();
     }
 
-    private static Predicate<Method> isJUnit4Test() {
+    private static Predicate<Method> isJUnitTest() {
         return m -> Arrays.stream(m.getAnnotationEntries())
                 .anyMatch(a -> a.getAnnotationType().equals(J_UNIT_4_TEST_ANNOTATION)
                         || a.getAnnotationType().equals(J_UNIT_5_TEST_ANNOTATION));
@@ -53,7 +53,7 @@ public class WrapperBenchmarkFactory {
 
     private Stream<String> findTestMethods(JavaClass bytecode) {
         Stream<String> declaredTestMethods = Arrays.stream(bytecode.getMethods())
-                .filter(isJUnit4Test())
+                .filter(isJUnitTest())
                 .map(FieldOrMethod::getName);
         InputClass superclass;
         try {

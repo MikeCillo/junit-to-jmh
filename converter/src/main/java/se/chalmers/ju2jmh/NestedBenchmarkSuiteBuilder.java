@@ -38,7 +38,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
-// IMPORT JUNIT 5
+// Import JUnit 5
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,10 +62,11 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class NestedBenchmarkSuiteBuilder {
-    private List<String> targetMethods = null;
+    private List<String> currentTargetMethods = null;
+    private final Map<String, List<String>> classSpecificTargetMethods = new HashMap<>();
 
     public void setTargetMethods(List<String> targetMethods) {
-        this.targetMethods = targetMethods;
+        this.currentTargetMethods = targetMethods;
     }
 
     private static final ClassOrInterfaceDeclaration BENCHMARK_CLASS_TEMPLATE =
@@ -86,43 +87,9 @@ public class NestedBenchmarkSuiteBuilder {
         this.inputClassRepository = new InputClassRepository(sourcePath, classPath);
     }
 
+    // Check permissivo: accettiamo tutto se richiesto dall'utente
     private boolean isTestClass(InputClass inputClass) {
-        JavaClass bytecode = inputClass.getBytecode();
-
-        if (bytecode.isInterface() || bytecode.isEnum() || bytecode.isAnnotation()) {
-            return false;
-        }
-
-        // Logica "manuale" che ha funzionato nel debug, ma senza le stampe.
-        // Questo ciclo controlla metodo per metodo.
-        boolean hasTestMethods = Arrays.stream(bytecode.getMethods())
-                .filter(AccessFlags::isPublic)
-                .filter(Bytecode.Predicates.hasArgCount(0))
-                .anyMatch(m -> {
-                    boolean match = Bytecode.Predicates.isMethodAnnotated(Test.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(Before.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(After.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(BeforeClass.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(AfterClass.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(Rule.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(ClassRule.class).test(m)
-                            // JUnit 5 Lifecycle
-                            || Bytecode.Predicates.isMethodAnnotated(BeforeAll.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(AfterAll.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(BeforeEach.class).test(m)
-                            || Bytecode.Predicates.isMethodAnnotated(AfterEach.class).test(m);
-                    return match;
-                });
-
-        if (hasTestMethods) {
-            return true;
-        }
-
-        return Arrays.stream(bytecode.getFields())
-                .filter(AccessFlags::isPublic)
-                .anyMatch(Bytecode.Predicates.isFieldAnnotated(Rule.class)
-                        .or(Bytecode.Predicates.isFieldAnnotated(ClassRule.class)));
+        return true;
     }
 
     private void addAbstractTestClass(String className) throws ClassNotFoundException {
@@ -138,9 +105,7 @@ public class NestedBenchmarkSuiteBuilder {
         }
         if (!benchmarkClasses.containsKey(superclassName)
                 && !abstractBenchmarkClasses.containsKey(superclassName)) {
-            if (isTestClass(inputClass)) {
-                abstractBenchmarkClasses.put(className, inputClass);
-            }
+            abstractBenchmarkClasses.put(className, inputClass);
         } else {
             abstractBenchmarkClasses.put(className, inputClass);
         }
@@ -149,10 +114,49 @@ public class NestedBenchmarkSuiteBuilder {
     public NestedBenchmarkSuiteBuilder addTestClass(String className)
             throws ClassNotFoundException {
         addAbstractTestClass(className);
+
         InputClass inputClass = abstractBenchmarkClasses.get(className);
+        if (inputClass == null) {
+            inputClass = inputClassRepository.findClass(className);
+        }
+
         if (inputClass != null && !inputClass.getBytecode().isAbstract()) {
             abstractBenchmarkClasses.remove(className);
             benchmarkClasses.put(className, inputClass);
+
+            // --- FIX CRITICO: Trasforma lista vuota in NULL ---
+            if (this.currentTargetMethods != null && !this.currentTargetMethods.isEmpty()) {
+                this.classSpecificTargetMethods.put(className, this.currentTargetMethods);
+            } else {
+                // Se la lista è vuota o null, forziamo null (significa "TUTTI I METODI")
+                this.classSpecificTargetMethods.put(className, null);
+            }
+            // --------------------------------------------------
+        }
+        return this;
+    }
+
+    // Nuovo overload: permette di aggiungere una classe e specificare direttamente
+    // la lista di metodi da convertire (null => tutti i metodi)
+    public NestedBenchmarkSuiteBuilder addTestClass(String className, List<String> methods)
+            throws ClassNotFoundException {
+        addAbstractTestClass(className);
+
+        InputClass inputClass = abstractBenchmarkClasses.get(className);
+        if (inputClass == null) {
+            inputClass = inputClassRepository.findClass(className);
+        }
+
+        if (inputClass != null && !inputClass.getBytecode().isAbstract()) {
+            abstractBenchmarkClasses.remove(className);
+            benchmarkClasses.put(className, inputClass);
+
+            if (methods != null && !methods.isEmpty()) {
+                this.classSpecificTargetMethods.put(className, methods);
+            } else {
+                // null significa "tutti i metodi"
+                this.classSpecificTargetMethods.put(className, null);
+            }
         }
         return this;
     }
@@ -251,8 +255,9 @@ public class NestedBenchmarkSuiteBuilder {
                     ? body.getStatements().remove(0)
                     : null;
 
-            Predicate<Method> isAnnotated = Bytecode.Predicates.isMethodAnnotated(annotation)
-                    .or(Bytecode.Predicates.isMethodAnnotated(modernAnnotation));
+            Predicate<Method> isAnnotated = m ->
+                    Bytecode.Predicates.isMethodAnnotated(annotation).test(m) ||
+                            Bytecode.Predicates.isMethodAnnotated(modernAnnotation).test(m);
 
             switch (methodType) {
                 case STATIC_METHOD:
@@ -438,7 +443,7 @@ public class NestedBenchmarkSuiteBuilder {
                             Bytecode.Predicates.isMethodAnnotated(Ignore.class).test(m)
                                     || Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Disabled.class).test(m)
                     ))
-                    // LIST FILTER
+                    // LIST FILTER: Se null, accetta tutto. Se lista, accetta solo se presente.
                     .filter(m -> {
                         if (allowedMethods == null || allowedMethods.isEmpty()) {
                             return true;
@@ -622,9 +627,15 @@ public class NestedBenchmarkSuiteBuilder {
             if (abstractBenchmarkClasses.containsKey(testClassName)) {
                 benchmarkClass.setAbstract(true);
             }
-            benchmarkClass.accept(new BenchmarkTemplateModifier(targetMethods), testInputClass);
+
+            // --- FIX FINALE: Recupera i metodi corretti per questa classe ---
+            List<String> methodsForThisClass = classSpecificTargetMethods.get(testClassName);
+            benchmarkClass.accept(new BenchmarkTemplateModifier(methodsForThisClass), testInputClass);
+            // ---------------------------------------------------------------
+
             enclosing.addMember(benchmarkClass);
         }
         return Collections.unmodifiableMap(compilationUnits);
     }
 }
+

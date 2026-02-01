@@ -3,6 +3,7 @@ package se.chalmers.ju2jmh;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import picocli.CommandLine;
 import se.chalmers.ju2jmh.api.ExceptionTest;
@@ -53,7 +54,7 @@ public class Converter implements Callable<Integer> {
             names = {"--ju4-runner-benchmark"},
             description = "Generate benchmarks delegating their execution to the JUnit 4 JUnitCore "
                     + "runner.")
-    private boolean ju4RunnerBenchmark;
+    private boolean juRunnerBenchmark;
 
     @CommandLine.Option(
             names = {"--tailored-benchmark"},
@@ -79,6 +80,12 @@ public class Converter implements Callable<Integer> {
     )
     private List<String> targetMethods;
 
+    @CommandLine.Option(
+            names = {"--strict"},
+            description = "Fail if a requested specific method is not found/converted."
+    )
+    private boolean strict = false;
+
     private static CompilationUnit loadApiSource(Class<?> apiClass) throws IOException {
         return StaticJavaParser.parseResource(
                 apiClass.getCanonicalName().replace('.', '/') + ".java");
@@ -94,33 +101,15 @@ public class Converter implements Callable<Integer> {
         }
     }
 
-   /* private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
+    private void generateNestedBenchmarks() throws ClassNotFoundException, IOException, InvalidInputClassException {
+        InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
+
+        // Costruiamo un builder singolo e aggiungiamo tutte le classi/metodi ad esso
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
-        if (targetMethods != null && !targetMethods.isEmpty()) {
-            benchmarkSuiteBuilder.setTargetMethods(targetMethods);
-        }
-        for (String className : classNames) {
-            benchmarkSuiteBuilder.addTestClass(className);
-        }
-        Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
-        for (String className : suite.keySet()) {
-            File outputFile =
-                    outputPath.resolve(className.replace('.', File.separatorChar) + ".java")
-                            .toFile();
-            writeSourceCodeToFile(suite.get(className), outputFile);
-        }
-        writeSourceCodeToFile(
-                loadApiSource(JU2JmhBenchmark.class),
-                outputPath.resolve(
-                        JU2JmhBenchmark.class.getCanonicalName()
-                                .replace('.', File.separatorChar) + ".java")
-                        .toFile());
-    }*/
 
-
-    private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
-        InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
+        // Manteniamo una mappa delle classi per cui l'utente ha richiesto metodi espliciti
+        Map<String, List<String>> explicitlyRequestedMethods = new HashMap<>();
 
         for (String inputArg : classNames) {
             String className = inputArg;
@@ -128,10 +117,11 @@ public class Converter implements Callable<Integer> {
 
             // Gestione del #
             if (inputArg.contains("#")) {
-                String[] parts = inputArg.split("#");
+                String[] parts = inputArg.split("#", 2);
                 className = parts[0];
                 if (parts.length > 1 && !parts[1].isEmpty()) {
                     methodsForThisClass.addAll(Arrays.asList(parts[1].split(",")));
+                    explicitlyRequestedMethods.put(className, methodsForThisClass);
                 }
             } else {
                 // Se c'Ã¨ il flag globale -m, usalo come fallback
@@ -147,20 +137,54 @@ public class Converter implements Callable<Integer> {
                 System.out.println("Convertendo PARZIALMENTE " + className + " metodi: " + methodsForThisClass);
             }
 
-            NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
-                    new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
-
-            // Passiamo la lista (anche se vuota, il Builder ora la gestisce grazie alla modifica al punto 1)
-            benchmarkSuiteBuilder.setTargetMethods(methodsForThisClass);
-
-            benchmarkSuiteBuilder.addTestClass(className);
-
-            Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
-            for (String generatedClassName : suite.keySet()) {
-                File outputFile = outputPath.resolve(
-                        generatedClassName.replace('.', File.separatorChar) + ".java").toFile();
-                writeSourceCodeToFile(suite.get(generatedClassName), outputFile);
+            // Aggiungi la classe al builder con la lista specificata (null => tutti i metodi)
+            if (methodsForThisClass.isEmpty()) {
+                benchmarkSuiteBuilder.addTestClass(className);
+            } else {
+                benchmarkSuiteBuilder.addTestClass(className, methodsForThisClass);
             }
+        }
+
+        Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
+
+        // Se --strict è abilitato, verifichiamo che per le classi dove l'utente ha chiesto
+        // metodi espliciti siano effettivamente stati generati dei benchmark.
+        if (strict && !explicitlyRequestedMethods.isEmpty()) {
+            for (Map.Entry<String, List<String>> e : explicitlyRequestedMethods.entrySet()) {
+                String className = e.getKey();
+                boolean foundBenchmarksForClass = false;
+                CompilationUnit generated = suite.get(className);
+                if (generated != null) {
+                    // Cerchiamo inner classes che abbiano metodi con prefisso 'benchmark_'
+                    for (TypeDeclaration<?> type : generated.getTypes()) {
+                        // Scorriamo i membri della compilation unit e le classi per trovare metodi benchmark
+                        List<MethodDeclaration> methods = type.findAll(MethodDeclaration.class);
+                        for (MethodDeclaration md : methods) {
+                            if (md.getNameAsString().startsWith("benchmark_")) {
+                                foundBenchmarksForClass = true;
+                                break;
+                            }
+                        }
+                        if (foundBenchmarksForClass) {
+                            break;
+                        }
+                    }
+                }
+                if (!foundBenchmarksForClass) {
+                    String msg = "Requested methods " + e.getValue() + " not found for class " + className;
+                    if (!ignoreFailures) {
+                        throw new InvalidInputClassException(msg);
+                    } else {
+                        System.err.println("Warning: " + msg);
+                    }
+                }
+            }
+        }
+
+        for (String generatedClassName : suite.keySet()) {
+            File outputFile = outputPath.resolve(
+                    generatedClassName.replace('.', File.separatorChar) + ".java").toFile();
+            writeSourceCodeToFile(suite.get(generatedClassName), outputFile);
         }
 
         // Scrittura classe base (una volta sola)
@@ -173,7 +197,7 @@ public class Converter implements Callable<Integer> {
     }
 
 
-    private void generateJU4Benchmarks()
+    private void generateJUBenchmarks()
             throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository =
                 new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
@@ -288,14 +312,14 @@ public class Converter implements Callable<Integer> {
                 }
             }
         }
-        if (!ju4RunnerBenchmark) {
+        if (!juRunnerBenchmark) {
             if (!tailoredBenchmark) {
                 generateNestedBenchmarks();
             } else {
                 generateTailoredBenchmarks();
             }
         } else {
-            generateJU4Benchmarks();
+            generateJUBenchmarks();
         }
         return 0;
     }
