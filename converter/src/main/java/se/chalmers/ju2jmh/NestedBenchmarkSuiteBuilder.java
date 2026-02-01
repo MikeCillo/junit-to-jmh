@@ -414,19 +414,37 @@ public class NestedBenchmarkSuiteBuilder {
             return benchmarkMethod;
         }
 
+
         private Stream<MethodDeclaration> generateBenchmarkMethods(InputClass arg) {
             return Arrays.stream(arg.getBytecode().getMethods())
                     .filter(AccessFlags::isPublic)
                     .filter(Predicate.not(AccessFlags::isStatic))
                     .filter(Bytecode.Predicates.hasArgCount(0))
-                    // MODIFICA CR-01: Accetta sia JUnit 4 che JUnit 5 per i test
+
+                    // JUnit 4 o 5
                     .filter(Bytecode.Predicates.isMethodAnnotated(Test.class)
                             .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Test.class)))
-                    // MODIFICA CR-01: Ignora sia @Ignore JUnit4 @Disabled JUnit5
+
+                    // Ignora Disabled/Ignore
                     .filter(Predicate.not(
                             Bytecode.Predicates.isMethodAnnotated(Ignore.class)
                                     .or(Bytecode.Predicates.isMethodAnnotated(org.junit.jupiter.api.Disabled.class))))
-                    .filter(m -> allowedMethods == null || allowedMethods.contains(m.getName()))
+
+                    // --- FIX CR-03: LOGICA ESPLICITA ---
+                    .filter(m -> {
+                        // Caso 1: allowedMethods è NULL -> Prendi tutto (comportamento di default)
+                        if (allowedMethods == null) {
+                            return true;
+                        }
+                        // Caso 2: allowedMethods è VUOTA -> Prendi tutto (nessuna selezione specifica fatta)
+                        if (allowedMethods.isEmpty()) {
+                            return true;
+                        }
+                        // Caso 3: C'è una lista -> Controlla se il metodo è presente
+                        return allowedMethods.contains(m.getName());
+                    })
+                    // ------------------------------------
+
                     .map(BenchmarkTemplateModifier::generateBenchmarkMethod);
         }
 

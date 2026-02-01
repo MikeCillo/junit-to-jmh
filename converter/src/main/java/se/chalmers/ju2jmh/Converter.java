@@ -120,35 +120,50 @@ public class Converter implements Callable<Integer> {
 
 
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException {
-        NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
-                new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
+        InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
 
-        // Lista dei metodi da convertire
-        List<String> effectiveTargetMethods = new ArrayList<>();
+        for (String inputArg : classNames) {
+            String className = inputArg;
+            List<String> methodsForThisClass = new ArrayList<>();
 
-        // Se è stato usato il flag -m aggiungiamo i metodi alla lista
-        if (targetMethods != null) {
-            effectiveTargetMethods.addAll(targetMethods);
-        }
+            // Gestione del #
+            if (inputArg.contains("#")) {
+                String[] parts = inputArg.split("#");
+                className = parts[0];
+                if (parts.length > 1 && !parts[1].isEmpty()) {
+                    methodsForThisClass.addAll(Arrays.asList(parts[1].split(",")));
+                }
+            } else {
+                // Se c'Ã¨ il flag globale -m, usalo come fallback
+                if (targetMethods != null && !targetMethods.isEmpty()) {
+                    methodsForThisClass.addAll(targetMethods);
+                }
+            }
 
-        // 2. aggiunta metodi
-        if (!effectiveTargetMethods.isEmpty()) {
-            benchmarkSuiteBuilder.setTargetMethods(effectiveTargetMethods);
-        }
+            // DEBUG: Stampa cosa sta succedendo
+            if (methodsForThisClass.isEmpty()) {
+                System.out.println("Convertendo TUTTA la classe: " + className);
+            } else {
+                System.out.println("Convertendo PARZIALMENTE " + className + " metodi: " + methodsForThisClass);
+            }
 
-        // 3 Aggiunta classi
-        for (String className : classNames) {
+            NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
+                    new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
+
+            // Passiamo la lista (anche se vuota, il Builder ora la gestisce grazie alla modifica al punto 1)
+            benchmarkSuiteBuilder.setTargetMethods(methodsForThisClass);
+
             benchmarkSuiteBuilder.addTestClass(className);
+
+            Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
+            for (String generatedClassName : suite.keySet()) {
+                File outputFile = outputPath.resolve(
+                        generatedClassName.replace('.', File.separatorChar) + ".java").toFile();
+                writeSourceCodeToFile(suite.get(generatedClassName), outputFile);
+            }
         }
 
-        // scrittura file
-        Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
-        for (String className : suite.keySet()) {
-            File outputFile =
-                    outputPath.resolve(className.replace('.', File.separatorChar) + ".java")
-                            .toFile();
-            writeSourceCodeToFile(suite.get(className), outputFile);
-        }
+        // Scrittura classe base (una volta sola)
         writeSourceCodeToFile(
                 loadApiSource(JU2JmhBenchmark.class),
                 outputPath.resolve(
@@ -156,6 +171,7 @@ public class Converter implements Callable<Integer> {
                                         .replace('.', File.separatorChar) + ".java")
                         .toFile());
     }
+
 
     private void generateJU4Benchmarks()
             throws ClassNotFoundException, IOException, InvalidInputClassException {
