@@ -30,6 +30,7 @@ public class InputClassRepository {
 
     /**
      * Creates a new InputClassRepository reading sources and bytecode from the given root paths.
+     * Creates a new InputClassRepository reading sources and bytecode from the given root paths.
      *
      * @param sourcePaths Root paths of the source files that can be loaded by this repository.
      * @param classPath   Root paths of the class files that can be loaded by this repository.

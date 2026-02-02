@@ -608,16 +608,32 @@ public class NestedBenchmarkSuiteBuilder {
                     findOutputTypeDeclaration(compilationUnits, testClassName);
             benchmarkClassNames.put(testClassName, benchmarkClassName(enclosing));
         }
+
+        // First pass: create benchmark class ASTs and store related info without adding them yet.
+        Map<String, ClassOrInterfaceDeclaration> generatedBenchmarks = new HashMap<>();
+        Map<String, InputClass> inputClasses = new HashMap<>();
+        Map<String, String> benchmarkSuperNames = new HashMap<>();
+
         for (String testClassName : benchmarkClassNames.keySet()) {
             TypeDeclaration<?> enclosing =
                     findOutputTypeDeclaration(compilationUnits, testClassName);
+
+            // Skip interfaces entirely: do not generate benchmark classes for interfaces
+            if (enclosing instanceof ClassOrInterfaceDeclaration
+                    && ((ClassOrInterfaceDeclaration) enclosing).isInterface()) {
+                continue;
+            }
+
             InputClass testInputClass = findInputClass(enclosing);
-            String superclassName =
-                    benchmarkClassNames.get(testInputClass.getSuperclassName());
+            inputClasses.put(testClassName, testInputClass);
+
+            String superclassName = benchmarkClassNames.get(testInputClass.getSuperclassName());
             if (superclassName != null) {
                 superclassName = ClassNames.canonicalClassName(
                         testInputClass.getSuperclassName() + "$" + superclassName);
+                benchmarkSuperNames.put(testClassName, superclassName);
             }
+
             ClassOrInterfaceDeclaration benchmarkClass = BENCHMARK_CLASS_TEMPLATE.clone();
             benchmarkClass.setName(benchmarkClassNames.get(testClassName));
             if (superclassName != null) {
@@ -628,12 +644,71 @@ public class NestedBenchmarkSuiteBuilder {
                 benchmarkClass.setAbstract(true);
             }
 
-            // --- FIX FINALE: Recupera i metodi corretti per questa classe ---
+            // Apply modifier to fill in methods/fields based on bytecode
             List<String> methodsForThisClass = classSpecificTargetMethods.get(testClassName);
             benchmarkClass.accept(new BenchmarkTemplateModifier(methodsForThisClass), testInputClass);
-            // ---------------------------------------------------------------
 
-            enclosing.addMember(benchmarkClass);
+            generatedBenchmarks.put(testClassName, benchmarkClass);
+        }
+
+        // Determine which benchmark classes should actually be added.
+        // Start with classes that contain JMH @Benchmark methods or overridden fixture methods
+        // (beforeClass/afterClass/before/after). Then propagate to subclasses that extend a
+        // benchmark class that will be generated.
+        Set<String> toAdd = generatedBenchmarks.entrySet().stream()
+                .filter(e -> {
+                    ClassOrInterfaceDeclaration bc = e.getValue();
+                    // Has explicit @Benchmark method
+                    boolean hasBenchmark = bc.getMembers().stream()
+                            .filter(BodyDeclaration::isMethodDeclaration)
+                            .map(BodyDeclaration::asMethodDeclaration)
+                            .anyMatch(m -> m.getAnnotationByName("Benchmark").isPresent());
+                    if (hasBenchmark) return true;
+                    // Has overridden fixture methods (beforeClass/afterClass/before/after)
+                    boolean hasFixtureOverrides = bc.getMembers().stream()
+                            .filter(BodyDeclaration::isMethodDeclaration)
+                            .map(BodyDeclaration::asMethodDeclaration)
+                            .anyMatch(m -> {
+                                String name = m.getNameAsString();
+                                return name.equals("beforeClass") || name.equals("afterClass")
+                                        || name.equals("before") || name.equals("after");
+                            });
+                    return hasFixtureOverrides;
+                })
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableSet())
+                .stream().collect(Collectors.toCollection(java.util.HashSet::new));
+
+        // Propagate to subclasses that extend a benchmark that will be generated
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (String className : generatedBenchmarks.keySet()) {
+                if (toAdd.contains(className)) continue;
+                String sup = inputClasses.get(className).getSuperclassName();
+                String supBenchmark = null;
+                if (sup != null) {
+                    String mapped = benchmarkClassNames.get(sup);
+                    if (mapped != null) {
+                        supBenchmark = ClassNames.canonicalClassName(sup + "$" + mapped);
+                    }
+                }
+                // If superclass was scheduled to be added, include this class as well
+                if (sup != null && toAdd.contains(sup)) {
+                    toAdd.add(className);
+                    changed = true;
+                }
+            }
+        }
+
+        // Finally, add the selected benchmark classes into their enclosing compilation units.
+        for (String testClassName : toAdd) {
+            TypeDeclaration<?> enclosing =
+                    findOutputTypeDeclaration(compilationUnits, testClassName);
+            ClassOrInterfaceDeclaration benchmarkClass = generatedBenchmarks.get(testClassName);
+            if (benchmarkClass != null) {
+                enclosing.addMember(benchmarkClass);
+            }
         }
         return Collections.unmodifiableMap(compilationUnits);
     }
