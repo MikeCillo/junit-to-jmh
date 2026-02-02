@@ -1,4 +1,4 @@
-package se.chalmers.ju2jmh.fixtures;
+package se.chalmers.ju2jmh.testinput.fixtures;
 
 public class BankAccount {
     private int balance;
