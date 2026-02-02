@@ -11,13 +11,13 @@ import se.chalmers.ju2jmh.api.JU2JmhBenchmark;
 import se.chalmers.ju2jmh.api.Rules;
 import se.chalmers.ju2jmh.api.ThrowingConsumer;
 import se.chalmers.ju2jmh.model.UnitTestClass;
-import com.github.javaparser.ParserConfiguration.LanguageLevel; //linguaggio
+import com.github.javaparser.ParserConfiguration.LanguageLevel; //language level
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.Console;// gestione dei conflitti quando il file di output esiste:
+import java.io.Console;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -106,7 +106,7 @@ public class Converter implements Callable<Integer> {
     private void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile) throws IOException {
         outputFile.getParentFile().mkdirs();
 
-        // 1. Se il file viene creato
+        // 1 if file NOT exists create it
         if (!outputFile.exists()) {
             if (!quiet) System.out.println("[CREATE] " + outputFile.getPath());
             try (OutputStreamWriter out = new OutputStreamWriter(
@@ -116,17 +116,17 @@ public class Converter implements Callable<Integer> {
             return;
         }
 
-        //   Se il contenuto è identico SALTA
+        //   Jump if content is the SAME
         try {
             String existingContent = Files.readString(outputFile.toPath(), StandardCharsets.UTF_8);
-            //  eliminazione spazi dalle stringhe
+            //  delete string spaces
             if (existingContent.trim().equals(benchmark.toString().trim())) {
                 return;
             }
         } catch (IOException e) {
         }
 
-        // 3. Gestione Conflitti (Se il contenuto è DIVERSO)
+        // 3  if file EXISTS and content is DIFFERENT
         String policy = (onConflict == null) ? "ask" : onConflict.toLowerCase();
         boolean doOverwrite = false;
         boolean doMerge = false;
@@ -174,10 +174,10 @@ public class Converter implements Callable<Integer> {
                     ClassOrInterfaceDeclaration existingCid = existingType.asClassOrInterfaceDeclaration();
                     ClassOrInterfaceDeclaration newCid = newType.asClassOrInterfaceDeclaration();
 
-                    // Cerca metodi benchmark nella classe principale
+                    // find benchmark_ methods
                     mergeMethods(existingCid, newCid);
 
-                    // Cerca metodi benchmark nella classe interna "_Benchmark"
+                    // find inner class named _Benchmark
                     existingCid.getMembers().stream()
                             .filter(member -> member.isClassOrInterfaceDeclaration())
                             .map(member -> member.asClassOrInterfaceDeclaration())
@@ -202,17 +202,18 @@ public class Converter implements Callable<Integer> {
                         out.append(benchmark.toString());
                     }
                 }
-            } catch (Exception e) {
-                System.err.println("[WARN] Merge failed for " + outputFile.getName() + ": " + e.getMessage() + ". Overwriting.");
-                try (OutputStreamWriter out = new OutputStreamWriter(
-                        new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
-                    out.append(benchmark.toString());
-                }
+            }  catch (Exception e) {
+            System.err.println("[WARN] Merge failed for " + outputFile.getName() + ": " + e.getMessage() + ". Overwriting.");
+            createBackup(outputFile);
+            try (OutputStreamWriter out = new OutputStreamWriter(
+                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                out.append(benchmark.toString());
             }
+        }
         }
     }
 
-    // Metodo Helper per evitare duplicazione codice
+
     private void mergeMethods(ClassOrInterfaceDeclaration source, ClassOrInterfaceDeclaration dest) {
         List<MethodDeclaration> oldBenchmarks = source.getMethods().stream()
                 .filter(m -> m.getNameAsString().startsWith("benchmark_"))
@@ -232,30 +233,21 @@ public class Converter implements Callable<Integer> {
         }
     }
 
-    // helper per normalizzare una ImportDeclaration e confrontarla senza duplicati
-    private String importKey(com.github.javaparser.ast.ImportDeclaration im) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(im.getNameAsString());
-        if (im.isStatic()) sb.append(" static");
-        if (im.isAsterisk()) sb.append(".*");
-        return sb.toString();
-    }
-
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
 
-        // Costruiamo un builder singolo e aggiungiamo tutte le classi/metodi ad esso
+        //builder and add all classes/methods to it
         NestedBenchmarkSuiteBuilder benchmarkSuiteBuilder =
                 new NestedBenchmarkSuiteBuilder(toPaths(sourcePath), toPaths(classPath));
 
-        // Manteniamo una mappa delle classi per cui l'utente ha richiesto metodi espliciti
+        // keep track of classes with Map
         Map<String, List<String>> explicitlyRequestedMethods = new HashMap<>();
 
         for (String inputArg : classNames) {
             String className = inputArg;
             List<String> methodsForThisClass = new ArrayList<>();
 
-            // Gestione del #
+            //  # method1,method2
             if (inputArg.contains("#")) {
                 String[] parts = inputArg.split("#", 2);
                 className = parts[0];
@@ -270,36 +262,36 @@ public class Converter implements Callable<Integer> {
                 }
             }
 
-            // Stampa non siamo in modalità quiet
+            // Print if not in quiet mode
             if (!quiet) {
                 if (methodsForThisClass.isEmpty()) {
-                    System.out.println("Convertendo TUTTA la classe: " + className);
+                    System.out.println("Converting ENTIRE class: " + className);
                 } else {
-                    System.out.println("Convertendo PARZIALMENTE " + className + " metodi: " + methodsForThisClass);
+                    System.out.println("PARTIALLY converting " + className + " methods: " + methodsForThisClass);
                 }
             }
 
-            // Aggiungi la classe al builder con la lista specificata
+            // Add the class to the builder with the specified list
             if (methodsForThisClass.isEmpty()) {
                 benchmarkSuiteBuilder.addTestClass(className);
             } else {
                 benchmarkSuiteBuilder.addTestClass(className, methodsForThisClass);
             }
-        }
+            }
 
         Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
 
-        // Se c'è --strict  verifichiamo che per le classi dove l'utente ha chiesto
-        // metodi espliciti siano effettivamente stati generati dei benchmark.
+
+        // if there's --strict we check that for the classes where the user requested
         if (strict && !explicitlyRequestedMethods.isEmpty()) {
             for (Map.Entry<String, List<String>> e : explicitlyRequestedMethods.entrySet()) {
                 String className = e.getKey();
                 boolean foundBenchmarksForClass = false;
                 CompilationUnit generated = suite.get(className);
                 if (generated != null) {
-                    // Cerchiamo inner classes che abbiano metodi con prefisso 'benchmark_'
+                    // find inner classes with methods starting with 'benchmark_'
                     for (TypeDeclaration<?> type : generated.getTypes()) {
-                        // Scorriamo i membri della compilation unit e le classi per trovare metodi benchmark
+                        // Check main class to find methods benchmark_
                         List<MethodDeclaration> methods = type.findAll(MethodDeclaration.class);
                         for (MethodDeclaration md : methods) {
                             if (md.getNameAsString().startsWith("benchmark_")) {
@@ -329,7 +321,7 @@ public class Converter implements Callable<Integer> {
             writeSourceCodeToFile(suite.get(generatedClassName), outputFile);
         }
 
-        // Scrittura classe base (una volta sola)
+        //  write JU2JmhBenchmark API class
         writeSourceCodeToFile(
                 loadApiSource(JU2JmhBenchmark.class),
                 outputPath.resolve(

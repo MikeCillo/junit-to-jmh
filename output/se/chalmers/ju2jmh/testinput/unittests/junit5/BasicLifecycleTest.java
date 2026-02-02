@@ -27,38 +27,4 @@ public class BasicLifecycleTest {
         // Benchmark 2
         Math.log(Math.random());
     }
-
-    @org.openjdk.jmh.annotations.State(org.openjdk.jmh.annotations.Scope.Thread)
-    public static class _Benchmark extends se.chalmers.ju2jmh.api.JU2JmhBenchmark {
-
-        @org.openjdk.jmh.annotations.Benchmark
-        public void benchmark_testMethodTwo() throws java.lang.Throwable {
-            this.createImplementation();
-            this.runBenchmark(this.implementation()::testMethodTwo, this.description("testMethodTwo"));
-        }
-
-        @java.lang.Override
-        public void before() throws java.lang.Throwable {
-            super.before();
-            this.implementation().init();
-        }
-
-        @java.lang.Override
-        public void after() throws java.lang.Throwable {
-            this.implementation().tearDown();
-            super.after();
-        }
-
-        private BasicLifecycleTest implementation;
-
-        @java.lang.Override
-        public void createImplementation() throws java.lang.Throwable {
-            this.implementation = new BasicLifecycleTest();
-        }
-
-        @java.lang.Override
-        public BasicLifecycleTest implementation() {
-            return this.implementation;
-        }
-    }
 }
