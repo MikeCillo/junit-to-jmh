@@ -17,6 +17,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.Console;// gestione dei conflitti quando il file di output esiste:
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -86,19 +87,199 @@ public class Converter implements Callable<Integer> {
     )
     private boolean strict = false;
 
+    @CommandLine.Option(
+            names = {"--on-conflict"},
+            description = "Policy when an output file already exists: ask|overwrite|merge. Default: ask"
+    )
+    private String onConflict = "ask";
+
     private static CompilationUnit loadApiSource(Class<?> apiClass) throws IOException {
         return StaticJavaParser.parseResource(
                 apiClass.getCanonicalName().replace('.', '/') + ".java");
     }
 
-    private static void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile)
+    private void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile)
             throws IOException {
+        // Assicura la presenza della directory di destinazione
         outputFile.getParentFile().mkdirs();
-        outputFile.createNewFile();
-        try (OutputStreamWriter out = new OutputStreamWriter(
-                new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
-            out.append(benchmark.toString());
+
+        // Se il file non esiste, lo creiamo e scriviamo direttamente
+        if (!outputFile.exists()) {
+            try (OutputStreamWriter out = new OutputStreamWriter(
+                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                out.append(benchmark.toString());
+            }
+            System.out.println("[CREATE] " + outputFile.getPath());
+            return;
         }
+
+        String policy = (onConflict == null) ? "ask" : onConflict.toLowerCase();
+        boolean doOverwrite = false;
+        boolean doMerge = false;
+
+        if (policy.equals("overwrite")) {
+            doOverwrite = true;
+        } else if (policy.equals("merge")) {
+            doMerge = true;
+        } else if (policy.equals("skip")) {
+            // policy esplicita per saltare la scrittura
+            System.out.println("[SKIP] " + outputFile.getPath());
+            return;
+        } else {
+            // ask
+            Console console = System.console();
+            if (console != null) {
+                String prompt = String.format(
+                        "File %s already exists. Choose: [o]verwrite, [m]erge (keep previous benchmark_ methods), [s]kip -- default overwrite: ",
+                        outputFile.getPath());
+                String line = console.readLine(prompt);
+                if (line == null) {
+                    doOverwrite = true;
+                } else {
+                    line = line.trim().toLowerCase();
+                    if (line.startsWith("o")) {
+                        doOverwrite = true;
+                    } else if (line.startsWith("m")) {
+                        doMerge = true;
+                    } else {
+                        System.out.println("[SKIP] " + outputFile.getPath());
+                        return;
+                    }
+                }
+            } else {
+                // Non-interactive environment: default to overwrite to avoid blocking
+                doOverwrite = true;
+                System.out.println("[ASK->OVERWRITE-NONINTERACTIVE] " + outputFile.getPath());
+            }
+        }
+
+        if (doOverwrite) {
+            // Creiamo un backup prima di sovrascrivere
+            createBackup(outputFile);
+            try (OutputStreamWriter out = new OutputStreamWriter(
+                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                out.append(benchmark.toString());
+            }
+            System.out.println("[OVERWRITE] " + outputFile.getPath());
+            return;
+        }
+
+        if (doMerge) {
+            com.github.javaparser.ast.CompilationUnit existing = null;
+            try {
+                existing = StaticJavaParser.parse(outputFile);
+            } catch (Exception e) {
+                // parsing failed: log e fallback to overwrite (preferere non perdere i dati)
+                System.err.println("[MERGE-ERR] Failed to parse existing file " + outputFile.getPath() + ": " + e.getMessage());
+
+                Console console = System.console();
+                boolean fallbackOverwrite = true; // default fallback
+                if (console != null) {
+                    String prompt = "Existing file could not be parsed for merge. Choose: [o]verwrite, [s]kip -- default overwrite: ";
+                    String line = console.readLine(prompt);
+                    if (line == null) {
+                        fallbackOverwrite = true;
+                    } else {
+                        line = line.trim().toLowerCase();
+                        if (line.startsWith("s")) {
+                            System.out.println("[SKIP] " + outputFile.getPath());
+                            return;
+                        } else {
+                            fallbackOverwrite = true;
+                        }
+                    }
+                }
+
+                if (fallbackOverwrite) {
+                    createBackup(outputFile);
+                    try (OutputStreamWriter out = new OutputStreamWriter(
+                            new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                        out.append(benchmark.toString());
+                    }
+                    System.out.println("[OVERWRITE] (fallback due to parse error) " + outputFile.getPath());
+                    return;
+                }
+            }
+
+            // Se siamo qui, existing è stato parsato con successo
+            if (existing == null) {
+                // should not happen, ma difensivamente scriviamo l'output
+                createBackup(outputFile);
+                try (OutputStreamWriter out = new OutputStreamWriter(
+                        new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                    out.append(benchmark.toString());
+                }
+                System.out.println("[OVERWRITE] (no existing CU) " + outputFile.getPath());
+                return;
+            }
+
+            // Merge imports (evitiamo duplicati)
+            java.util.Set<String> benchmarkImportKeys = new java.util.HashSet<>();
+            benchmark.getImports().forEach(im -> benchmarkImportKeys.add(importKey(im)));
+            existing.getImports().forEach(im -> {
+                String key = importKey(im);
+                if (!benchmarkImportKeys.contains(key)) {
+                    benchmark.addImport(im.clone());
+                    benchmarkImportKeys.add(key);
+                    System.out.println("[MERGE] Added import: " + key);
+                }
+            });
+
+            if (benchmark.getTypes().isEmpty()) {
+                System.out.println("[MERGE] Nothing to merge (no types) for " + outputFile.getPath());
+                return;
+            }
+
+            com.github.javaparser.ast.body.TypeDeclaration<?> newType = benchmark.getTypes().get(0);
+            String newTypeName = newType.getNameAsString();
+
+            com.github.javaparser.ast.body.TypeDeclaration<?> existingType = null;
+            for (com.github.javaparser.ast.body.TypeDeclaration<?> t : existing.getTypes()) {
+                if (t.getNameAsString().equals(newTypeName)) {
+                    existingType = t;
+                    break;
+                }
+            }
+
+            if (existingType != null && existingType.isClassOrInterfaceDeclaration() && newType.isClassOrInterfaceDeclaration()) {
+                ClassOrInterfaceDeclaration existingCid = existingType.asClassOrInterfaceDeclaration();
+                ClassOrInterfaceDeclaration newCid = newType.asClassOrInterfaceDeclaration();
+
+                java.util.List<MethodDeclaration> existingBenchMethods = existingCid.getMethods().stream()
+                        .filter(m -> m.getNameAsString().startsWith("benchmark_"))
+                        .collect(Collectors.toList());
+
+                for (MethodDeclaration m : existingBenchMethods) {
+                    boolean present = newCid.getMethods().stream()
+                            .anyMatch(nm -> nm.getNameAsString().equals(m.getNameAsString()));
+                    if (!present) {
+                        newCid.addMember(m.clone());
+                        System.out.println("[MERGE] Added method " + m.getNameAsString() + " to " + newTypeName);
+                    } else {
+                        System.out.println("[MERGE] Skipped duplicate method " + m.getNameAsString());
+                    }
+                }
+            } else {
+                System.out.println("[MERGE] No matching top-level type '" + newTypeName + "' in existing file; skipping method merge.");
+            }
+
+            // backup and write merged result
+            createBackup(outputFile);
+            try (OutputStreamWriter out = new OutputStreamWriter(
+                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                out.append(benchmark.toString());
+            }
+            System.out.println("[MERGE] " + outputFile.getPath());
+        }
+    }
+
+    // helper per normalizzare una ImportDeclaration e confrontarla senza duplicati
+    private String importKey(com.github.javaparser.ast.ImportDeclaration im) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(im.getNameAsString());
+        if (im.isStatic()) sb.append(" static");
+        if (im.isAsterisk()) sb.append(".*");
+        return sb.toString();
     }
 
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException, InvalidInputClassException {
@@ -322,6 +503,18 @@ public class Converter implements Callable<Integer> {
             generateJUBenchmarks();
         }
         return 0;
+    }
+
+
+    //  HELPER PER IL BACKUP
+    private void createBackup(File file) {
+        try {
+            Path backupPath = Path.of(file.getAbsolutePath() + ".bak");
+            Files.copy(file.toPath(), backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            // System.out.println("[BACKUP] Created: " + backupPath.getFileName()); // Decommenta se vuoi log prolisso
+        } catch (IOException e) {
+            System.err.println("[WARN] Failed to create backup for " + file.getName() + ": " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {
