@@ -1,4 +1,4 @@
-package se.chalmers.ju2jmh.testinput.unittests;
+cat output/se/chalmers/ju2jmh/testinput/unittests/TwoTestCases.javapackage se.chalmers.ju2jmh.testinput.unittests;
 
 import org.junit.Test;
 
@@ -16,9 +16,9 @@ public class TwoTestCases {
     public static class _Benchmark extends se.chalmers.ju2jmh.api.JU2JmhBenchmark {
 
         @org.openjdk.jmh.annotations.Benchmark
-        public void benchmark_test1() throws java.lang.Throwable {
+        public void benchmark_test2() throws java.lang.Throwable {
             this.createImplementation();
-            this.runBenchmark(this.implementation()::test1, this.description("test1"));
+            this.runBenchmark(this.implementation()::test2, this.description("test2"));
         }
 
         private TwoTestCases implementation;
@@ -31,6 +31,12 @@ public class TwoTestCases {
         @java.lang.Override
         public TwoTestCases implementation() {
             return this.implementation;
+        }
+
+        @org.openjdk.jmh.annotations.Benchmark
+        public void benchmark_test1() throws java.lang.Throwable {
+            this.createImplementation();
+            this.runBenchmark(this.implementation()::test1, this.description("test1"));
         }
     }
 }
