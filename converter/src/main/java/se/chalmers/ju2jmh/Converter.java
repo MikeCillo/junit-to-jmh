@@ -79,6 +79,7 @@ public class Converter implements Callable<Integer> {
             description = "Specific methods to convert (comma separated). If omitted, all tests are converted.",
             split = ","
     )
+
     private List<String> targetMethods;
 
     @CommandLine.Option(
@@ -93,183 +94,141 @@ public class Converter implements Callable<Integer> {
     )
     private String onConflict = "ask";
 
+    @CommandLine.Option(names = {"-q", "--quiet"}, description = "Suppress output logs like [CREATE], [OVERWRITE], etc.")
+    private boolean quiet = false;
+
     private static CompilationUnit loadApiSource(Class<?> apiClass) throws IOException {
         return StaticJavaParser.parseResource(
                 apiClass.getCanonicalName().replace('.', '/') + ".java");
     }
 
-    private void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile)
-            throws IOException {
-        // Assicura la presenza della directory di destinazione
+
+    private void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile) throws IOException {
         outputFile.getParentFile().mkdirs();
 
-        // Se il file non esiste, lo creiamo e scriviamo direttamente
+        // 1. Se il file viene creato
         if (!outputFile.exists()) {
+            if (!quiet) System.out.println("[CREATE] " + outputFile.getPath());
             try (OutputStreamWriter out = new OutputStreamWriter(
-                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
+                    new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
                 out.append(benchmark.toString());
             }
-            System.out.println("[CREATE] " + outputFile.getPath());
             return;
         }
 
+        //   Se il contenuto è identico SALTA
+        try {
+            String existingContent = Files.readString(outputFile.toPath(), StandardCharsets.UTF_8);
+            //  eliminazione spazi dalle stringhe
+            if (existingContent.trim().equals(benchmark.toString().trim())) {
+                return;
+            }
+        } catch (IOException e) {
+        }
+
+        // 3. Gestione Conflitti (Se il contenuto è DIVERSO)
         String policy = (onConflict == null) ? "ask" : onConflict.toLowerCase();
         boolean doOverwrite = false;
         boolean doMerge = false;
 
-        if (policy.equals("overwrite")) {
-            doOverwrite = true;
-        } else if (policy.equals("merge")) {
-            doMerge = true;
-        } else if (policy.equals("skip")) {
-            // policy esplicita per saltare la scrittura
-            System.out.println("[SKIP] " + outputFile.getPath());
-            return;
-        } else {
-            // ask
+        if (policy.equals("overwrite")) doOverwrite = true;
+        else if (policy.equals("merge")) doMerge = true;
+        else { // ask
             Console console = System.console();
             if (console != null) {
-                String prompt = String.format(
-                        "File %s already exists. Choose: [o]verwrite, [m]erge (keep previous benchmark_ methods), [s]kip -- default overwrite: ",
-                        outputFile.getPath());
+                String prompt = String.format("File %s has CHANGED. Choose: [o]verwrite, [m]erge (keep previous benchmarks), [s]kip: ", outputFile.getName());
                 String line = console.readLine(prompt);
-                if (line == null) {
-                    doOverwrite = true;
-                } else {
-                    line = line.trim().toLowerCase();
-                    if (line.startsWith("o")) {
-                        doOverwrite = true;
-                    } else if (line.startsWith("m")) {
-                        doMerge = true;
-                    } else {
-                        System.out.println("[SKIP] " + outputFile.getPath());
-                        return;
-                    }
-                }
+                if (line != null && line.trim().toLowerCase().startsWith("m")) doMerge = true;
+                else if (line != null && line.trim().toLowerCase().startsWith("o")) doOverwrite = true;
+                else return;
             } else {
-                // Non-interactive environment: default to overwrite to avoid blocking
                 doOverwrite = true;
-                System.out.println("[ASK->OVERWRITE-NONINTERACTIVE] " + outputFile.getPath());
             }
         }
 
         if (doOverwrite) {
-            // Creiamo un backup prima di sovrascrivere
+            if (!quiet) System.out.println("[OVERWRITE] " + outputFile.getPath());
             createBackup(outputFile);
             try (OutputStreamWriter out = new OutputStreamWriter(
                     new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
                 out.append(benchmark.toString());
             }
-            System.out.println("[OVERWRITE] " + outputFile.getPath());
             return;
         }
 
         if (doMerge) {
-            com.github.javaparser.ast.CompilationUnit existing = null;
             try {
-                existing = StaticJavaParser.parse(outputFile);
-            } catch (Exception e) {
-                // parsing failed: log e fallback to overwrite (preferere non perdere i dati)
-                System.err.println("[MERGE-ERR] Failed to parse existing file " + outputFile.getPath() + ": " + e.getMessage());
+                CompilationUnit existingCU = StaticJavaParser.parse(outputFile);
 
-                Console console = System.console();
-                boolean fallbackOverwrite = true; // default fallback
-                if (console != null) {
-                    String prompt = "Existing file could not be parsed for merge. Choose: [o]verwrite, [s]kip -- default overwrite: ";
-                    String line = console.readLine(prompt);
-                    if (line == null) {
-                        fallbackOverwrite = true;
-                    } else {
-                        line = line.trim().toLowerCase();
-                        if (line.startsWith("s")) {
-                            System.out.println("[SKIP] " + outputFile.getPath());
-                            return;
-                        } else {
-                            fallbackOverwrite = true;
-                        }
-                    }
-                }
+                // Merge IMPORTS
+                existingCU.getImports().forEach(im -> {
+                    if (!benchmark.getImports().contains(im)) benchmark.addImport(im);
+                });
 
-                if (fallbackOverwrite) {
+                TypeDeclaration<?> newType = benchmark.getTypes().get(0);
+                TypeDeclaration<?> existingType = existingCU.getTypes().stream()
+                        .filter(t -> t.getNameAsString().equals(newType.getNameAsString()))
+                        .findFirst().orElse(null);
+
+                if (existingType != null && existingType.isClassOrInterfaceDeclaration() && newType.isClassOrInterfaceDeclaration()) {
+                    ClassOrInterfaceDeclaration existingCid = existingType.asClassOrInterfaceDeclaration();
+                    ClassOrInterfaceDeclaration newCid = newType.asClassOrInterfaceDeclaration();
+
+                    // Cerca metodi benchmark nella classe principale
+                    mergeMethods(existingCid, newCid);
+
+                    // Cerca metodi benchmark nella classe interna "_Benchmark"
+                    existingCid.getMembers().stream()
+                            .filter(member -> member.isClassOrInterfaceDeclaration())
+                            .map(member -> member.asClassOrInterfaceDeclaration())
+                            .filter(inner -> inner.getNameAsString().equals("_Benchmark"))
+                            .findFirst()
+                            .ifPresent(existingInner -> {
+                                newCid.getMembers().stream()
+                                        .filter(m -> m.isClassOrInterfaceDeclaration())
+                                        .map(m -> m.asClassOrInterfaceDeclaration())
+                                        .filter(newInner -> newInner.getNameAsString().equals("_Benchmark"))
+                                        .findFirst()
+                                        .ifPresent(newInner -> {
+                                            mergeMethods(existingInner, newInner);
+                                        });
+                            });
+
+                    if (!quiet) System.out.println("[MERGE] " + outputFile.getPath());
                     createBackup(outputFile);
+
                     try (OutputStreamWriter out = new OutputStreamWriter(
                             new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
                         out.append(benchmark.toString());
                     }
-                    System.out.println("[OVERWRITE] (fallback due to parse error) " + outputFile.getPath());
-                    return;
                 }
-            }
-
-            // Se siamo qui, existing è stato parsato con successo
-            if (existing == null) {
-                // should not happen, ma difensivamente scriviamo l'output
-                createBackup(outputFile);
+            } catch (Exception e) {
+                System.err.println("[WARN] Merge failed for " + outputFile.getName() + ": " + e.getMessage() + ". Overwriting.");
                 try (OutputStreamWriter out = new OutputStreamWriter(
                         new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
                     out.append(benchmark.toString());
                 }
-                System.out.println("[OVERWRITE] (no existing CU) " + outputFile.getPath());
-                return;
             }
+        }
+    }
 
-            // Merge imports (evitiamo duplicati)
-            java.util.Set<String> benchmarkImportKeys = new java.util.HashSet<>();
-            benchmark.getImports().forEach(im -> benchmarkImportKeys.add(importKey(im)));
-            existing.getImports().forEach(im -> {
-                String key = importKey(im);
-                if (!benchmarkImportKeys.contains(key)) {
-                    benchmark.addImport(im.clone());
-                    benchmarkImportKeys.add(key);
-                    System.out.println("[MERGE] Added import: " + key);
-                }
-            });
+    // Metodo Helper per evitare duplicazione codice
+    private void mergeMethods(ClassOrInterfaceDeclaration source, ClassOrInterfaceDeclaration dest) {
+        List<MethodDeclaration> oldBenchmarks = source.getMethods().stream()
+                .filter(m -> m.getNameAsString().startsWith("benchmark_"))
+                .collect(Collectors.toList());
 
-            if (benchmark.getTypes().isEmpty()) {
-                System.out.println("[MERGE] Nothing to merge (no types) for " + outputFile.getPath());
-                return;
+        int count = 0;
+        for (MethodDeclaration oldMethod : oldBenchmarks) {
+            boolean present = dest.getMethods().stream()
+                    .anyMatch(nm -> nm.getNameAsString().equals(oldMethod.getNameAsString()));
+            if (!present) {
+                dest.addMember(oldMethod.clone());
+                count++;
             }
-
-            com.github.javaparser.ast.body.TypeDeclaration<?> newType = benchmark.getTypes().get(0);
-            String newTypeName = newType.getNameAsString();
-
-            com.github.javaparser.ast.body.TypeDeclaration<?> existingType = null;
-            for (com.github.javaparser.ast.body.TypeDeclaration<?> t : existing.getTypes()) {
-                if (t.getNameAsString().equals(newTypeName)) {
-                    existingType = t;
-                    break;
-                }
-            }
-
-            if (existingType != null && existingType.isClassOrInterfaceDeclaration() && newType.isClassOrInterfaceDeclaration()) {
-                ClassOrInterfaceDeclaration existingCid = existingType.asClassOrInterfaceDeclaration();
-                ClassOrInterfaceDeclaration newCid = newType.asClassOrInterfaceDeclaration();
-
-                java.util.List<MethodDeclaration> existingBenchMethods = existingCid.getMethods().stream()
-                        .filter(m -> m.getNameAsString().startsWith("benchmark_"))
-                        .collect(Collectors.toList());
-
-                for (MethodDeclaration m : existingBenchMethods) {
-                    boolean present = newCid.getMethods().stream()
-                            .anyMatch(nm -> nm.getNameAsString().equals(m.getNameAsString()));
-                    if (!present) {
-                        newCid.addMember(m.clone());
-                        System.out.println("[MERGE] Added method " + m.getNameAsString() + " to " + newTypeName);
-                    } else {
-                        System.out.println("[MERGE] Skipped duplicate method " + m.getNameAsString());
-                    }
-                }
-            } else {
-                System.out.println("[MERGE] No matching top-level type '" + newTypeName + "' in existing file; skipping method merge.");
-            }
-
-            // backup and write merged result
-            createBackup(outputFile);
-            try (OutputStreamWriter out = new OutputStreamWriter(
-                    new FileOutputStream(outputFile, false), StandardCharsets.UTF_8)) {
-                out.append(benchmark.toString());
-            }
-            System.out.println("[MERGE] " + outputFile.getPath());
+        }
+        if (count > 0) {
+            System.out.println("   -> Recovered " + count + " methods from " + source.getNameAsString());
         }
     }
 
@@ -305,20 +264,22 @@ public class Converter implements Callable<Integer> {
                     explicitlyRequestedMethods.put(className, methodsForThisClass);
                 }
             } else {
-                // Se c'Ã¨ il flag globale -m, usalo come fallback
+                // -m
                 if (targetMethods != null && !targetMethods.isEmpty()) {
                     methodsForThisClass.addAll(targetMethods);
                 }
             }
 
-            // DEBUG: Stampa cosa sta succedendo
-            if (methodsForThisClass.isEmpty()) {
-                System.out.println("Convertendo TUTTA la classe: " + className);
-            } else {
-                System.out.println("Convertendo PARZIALMENTE " + className + " metodi: " + methodsForThisClass);
+            // Stampa non siamo in modalità quiet
+            if (!quiet) {
+                if (methodsForThisClass.isEmpty()) {
+                    System.out.println("Convertendo TUTTA la classe: " + className);
+                } else {
+                    System.out.println("Convertendo PARZIALMENTE " + className + " metodi: " + methodsForThisClass);
+                }
             }
 
-            // Aggiungi la classe al builder con la lista specificata (null => tutti i metodi)
+            // Aggiungi la classe al builder con la lista specificata
             if (methodsForThisClass.isEmpty()) {
                 benchmarkSuiteBuilder.addTestClass(className);
             } else {
@@ -328,7 +289,7 @@ public class Converter implements Callable<Integer> {
 
         Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
 
-        // Se --strict è abilitato, verifichiamo che per le classi dove l'utente ha chiesto
+        // Se c'è --strict  verifichiamo che per le classi dove l'utente ha chiesto
         // metodi espliciti siano effettivamente stati generati dei benchmark.
         if (strict && !explicitlyRequestedMethods.isEmpty()) {
             for (Map.Entry<String, List<String>> e : explicitlyRequestedMethods.entrySet()) {
@@ -511,7 +472,6 @@ public class Converter implements Callable<Integer> {
         try {
             Path backupPath = Path.of(file.getAbsolutePath() + ".bak");
             Files.copy(file.toPath(), backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            // System.out.println("[BACKUP] Created: " + backupPath.getFileName()); // Decommenta se vuoi log prolisso
         } catch (IOException e) {
             System.err.println("[WARN] Failed to create backup for " + file.getName() + ": " + e.getMessage());
         }

@@ -22,38 +22,4 @@ public class StaticLifecycleTest {
         // Il carico di lavoro
         int a = 1 + 1;
     }
-
-    @org.openjdk.jmh.annotations.State(org.openjdk.jmh.annotations.Scope.Thread)
-    public static class _Benchmark extends se.chalmers.ju2jmh.api.JU2JmhBenchmark {
-
-        @org.openjdk.jmh.annotations.Benchmark
-        public void benchmark_benchmarkWorkload() throws java.lang.Throwable {
-            this.createImplementation();
-            this.runBenchmark(this.implementation()::benchmarkWorkload, this.description("benchmarkWorkload"));
-        }
-
-        @java.lang.Override
-        public void beforeClass() throws java.lang.Throwable {
-            super.beforeClass();
-            StaticLifecycleTest.globalSetup();
-        }
-
-        @java.lang.Override
-        public void afterClass() throws java.lang.Throwable {
-            StaticLifecycleTest.globalTeardown();
-            super.afterClass();
-        }
-
-        private StaticLifecycleTest implementation;
-
-        @java.lang.Override
-        public void createImplementation() throws java.lang.Throwable {
-            this.implementation = new StaticLifecycleTest();
-        }
-
-        @java.lang.Override
-        public StaticLifecycleTest implementation() {
-            return this.implementation;
-        }
-    }
 }
