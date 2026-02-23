@@ -87,7 +87,6 @@ public class NestedBenchmarkSuiteBuilder {
         this.inputClassRepository = new InputClassRepository(sourcePath, classPath);
     }
 
-    // Check permissivo: accettiamo tutto se richiesto dall'utente
     private boolean isTestClass(InputClass inputClass) {
         return true;
     }
@@ -124,11 +123,9 @@ public class NestedBenchmarkSuiteBuilder {
             abstractBenchmarkClasses.remove(className);
             benchmarkClasses.put(className, inputClass);
 
-            // --- FIX CRITICO: Trasforma lista vuota in NULL ---
             if (this.currentTargetMethods != null && !this.currentTargetMethods.isEmpty()) {
                 this.classSpecificTargetMethods.put(className, this.currentTargetMethods);
             } else {
-                // Se la lista è vuota o null, forziamo null (significa "TUTTI I METODI")
                 this.classSpecificTargetMethods.put(className, null);
             }
             // --------------------------------------------------
@@ -136,8 +133,7 @@ public class NestedBenchmarkSuiteBuilder {
         return this;
     }
 
-    // Nuovo overload: permette di aggiungere una classe e specificare direttamente
-    // la lista di metodi da convertire (null => tutti i metodi)
+
     public NestedBenchmarkSuiteBuilder addTestClass(String className, List<String> methods)
             throws ClassNotFoundException {
         addAbstractTestClass(className);

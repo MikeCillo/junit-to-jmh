@@ -8,18 +8,16 @@ public class StaticLifecycleTest {
 
     @BeforeAll
     public static void globalSetup() {
-        // Questo deve diventare @Setup(Level.Trial)
-        // È eseguito una volta sola per tutto il benchmark
+        // become @Setup(Level.Trial)
     }
 
     @AfterAll
     public static void globalTeardown() {
-        // Questo deve diventare @TearDown(Level.Trial)
+        // become @TearDown(Level.Trial)
     }
 
     @Test
     public void benchmarkWorkload() {
-        // Il carico di lavoro
         int a = 1 + 1;
     }
 }

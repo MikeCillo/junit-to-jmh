@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 
 public class ExceptionLogicTest {
 
+    //exception logic test, should be converted to a benchmark that expects an exception to be thrown
     @Test
     public void testExpectedException() {
-        // Il convertitore deve mantenere questa struttura lambda
         Assertions.assertThrows(NumberFormatException.class, () -> {
             Integer.parseInt("Non è un numero");
         });
@@ -15,7 +15,6 @@ public class ExceptionLogicTest {
 
     @Test
     public void testNoException() {
-        // Caso di controllo
         Integer.parseInt("12345");
     }
 }

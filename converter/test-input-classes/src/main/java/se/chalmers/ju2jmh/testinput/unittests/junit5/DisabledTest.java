@@ -7,13 +7,15 @@ public class DisabledTest {
 
     @Test
     public void activeTest() {
-        // Questo DOVREBBE essere convertito
+
     }
 
     @Test
-    @Disabled("Questo test non deve diventare un benchmark")
+    @Disabled("not supposed to be a benchmark")
     public void skippedTest() {
-        // Questo NON deve apparire nell'output o deve essere commentato
-        throw new RuntimeException("Non dovrei essere eseguito");
+        throw new RuntimeException("Not supposed to run");
     }
+
+
+
 }

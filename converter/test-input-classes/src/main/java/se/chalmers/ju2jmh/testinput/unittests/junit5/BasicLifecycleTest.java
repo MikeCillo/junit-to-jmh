@@ -8,12 +8,12 @@ public class BasicLifecycleTest {
 
     @BeforeEach
     public void init() {
-        // Questo deve diventare @Setup(Level.Iteration)
+       //become @Setup(Level.Iteration)
     }
 
     @AfterEach
     public void tearDown() {
-        // Questo deve diventare @TearDown(Level.Iteration)
+        // become @TearDown(Level.Iteration)
     }
 
     @Test

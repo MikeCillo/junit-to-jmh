@@ -9,9 +9,9 @@ public class ComplexLifecycleTest {
     private static List<String> sharedResource;
     private List<String> transactionLog;
 
+
     @BeforeAll
     public static void globalSetup() {
-        // Setup Eseguito una volta per l'intero benchmark
         sharedResource = new ArrayList<>();
         sharedResource.add("DB_CONFIG");
         try { Thread.sleep(50); } catch (InterruptedException e) {}
@@ -24,7 +24,6 @@ public class ComplexLifecycleTest {
 
     @BeforeEach
     public void methodSetup() {
-        // Setup Eseguito prima di ogni invocazione del benchmark
         transactionLog = new ArrayList<>();
         transactionLog.add("START_TX");
     }
@@ -36,7 +35,6 @@ public class ComplexLifecycleTest {
 
     @Test
     public void testInteraction() {
-        // Usa sia la risorsa statica che quella di istanza
         if (!sharedResource.contains("DB_CONFIG")) {
             throw new RuntimeException("Global setup failed");
         }

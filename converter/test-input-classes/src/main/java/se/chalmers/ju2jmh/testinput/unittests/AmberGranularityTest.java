@@ -7,14 +7,14 @@ public class AmberGranularityTest {
     // 1. Feature Java 17 (Record)
     public record Person(String name, int age) {}
 
-    // 2. Metodo che VOGLIAMO convertire
+    // conversion test for Java 17 record features, should be converted to a normal class with getters and constructor
     @Test
     public void testAmberFeature() {
         Person p = new Person("Benito", 24);
         System.out.println(p);
     }
 
-    // 3. Metodo che VOGLIAMO IGNORARE
+    // ignored test
     @Test
     public void testToSkip() {
         System.out.println("Test to be skipped");

@@ -11,9 +11,9 @@ dependencies {
     val jUnit4Version: String by rootProject.extra
 
     compileOnly("junit", "junit", jUnit4Version)
-    //dipendenza necessaria per eseguire i test con JUnit 5
+    //junit 5
     implementation("org.junit.jupiter:junit-jupiter:5.10.0")
-    // rendere disponibili le annotazioni JMH per i file di test-input-classes
+    // jmh annotations
     compileOnly("org.openjdk.jmh:jmh-core:1.37")
 
 }

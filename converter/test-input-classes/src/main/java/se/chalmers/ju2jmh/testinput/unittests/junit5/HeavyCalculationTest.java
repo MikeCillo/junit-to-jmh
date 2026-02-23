@@ -12,23 +12,25 @@ public class HeavyCalculationTest {
 
     @Test
     public void testSortLargeList() {
-        // Genera una lista di 10.000 interi casuali
+
         List<Integer> numbers = new Random().ints(10_000).boxed().collect(Collectors.toList());
 
-        // Operazione costosa (O(N log N)) che il benchmark dovrà misurare
+        //benchmarking the sorting of a large list
         Collections.sort(numbers);
     }
 
     @Test
     public void testStreamProcessing() {
-        // Calcolo pesante usando gli Stream: somma dei quadrati dei numeri pari fino a 100.000
         long sum = IntStream.range(0, 100_000)
                 .filter(n -> n % 2 == 0)
                 .mapToLong(n -> n * n)
                 .sum();
 
-        // Un blackhole implicito (se il convertitore supporta il return value sarebbe meglio,
-        // ma per ora vediamo se compila)
-        if (sum == 0) throw new RuntimeException("Impossibile");
+        if (sum == 0) throw new RuntimeException("Impossible");
+    }
+
+    @Test
+    public void benchmarkWorkload() {
+        int a = 1 + 10;
     }
 }

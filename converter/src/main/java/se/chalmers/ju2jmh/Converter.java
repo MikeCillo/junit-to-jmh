@@ -21,11 +21,7 @@ import java.io.Console;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -51,10 +47,12 @@ public class Converter implements Callable<Integer> {
             index = "3..*")
     private List<String> classNames;
 
+
+    /* JUNIT 5 AND JUNIT4 BENCHMARKS GENERATION OPTIONS */
     @CommandLine.Option(
-            names = {"--ju4-runner-benchmark"},
-            description = "Generate benchmarks delegating their execution to the JUnit 4 JUnitCore "
-                    + "runner.")
+            names = {"--ju-runner-benchmark"},
+            description = "Generate benchmarks delegating their execution to the underlying "
+                    + "JUnit runner (supports both JUnit 4 and JUnit 5).")
     private boolean juRunnerBenchmark;
 
     @CommandLine.Option(
@@ -82,11 +80,6 @@ public class Converter implements Callable<Integer> {
 
     private List<String> targetMethods;
 
-    @CommandLine.Option(
-            names = {"--strict"},
-            description = "Fail if a requested specific method is not found/converted."
-    )
-    private boolean strict = false;
 
     @CommandLine.Option(
             names = {"--on-conflict"},
@@ -109,6 +102,8 @@ public class Converter implements Callable<Integer> {
         // 1 if file NOT exists create it
         if (!outputFile.exists()) {
             if (!quiet) System.out.println("[CREATE] " + outputFile.getPath());
+
+            //write file
             try (OutputStreamWriter out = new OutputStreamWriter(
                     new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
                 out.append(benchmark.toString());
@@ -125,7 +120,6 @@ public class Converter implements Callable<Integer> {
             }
         } catch (IOException e) {
         }
-
         // 3  if file EXISTS and content is DIFFERENT
         String policy = (onConflict == null) ? "ask" : onConflict.toLowerCase();
         boolean doOverwrite = false;
@@ -133,15 +127,32 @@ public class Converter implements Callable<Integer> {
 
         if (policy.equals("overwrite")) doOverwrite = true;
         else if (policy.equals("merge")) doMerge = true;
+
         else { // ask
+            String prompt = String.format("File %s has CHANGED. Choose: [o]verwrite, [m]erge (keep previous benchmarks), [s]kip: ", outputFile.getName());
+            String line = null;
+
             Console console = System.console();
             if (console != null) {
-                String prompt = String.format("File %s has CHANGED. Choose: [o]verwrite, [m]erge (keep previous benchmarks), [s]kip: ", outputFile.getName());
-                String line = console.readLine(prompt);
-                if (line != null && line.trim().toLowerCase().startsWith("m")) doMerge = true;
-                else if (line != null && line.trim().toLowerCase().startsWith("o")) doOverwrite = true;
-                else return;
-            } else {
+                //  terminal
+                line = console.readLine(prompt);
+            } else { //ide
+                System.out.print(prompt);
+                System.out.flush();
+                try {
+                    java.util.Scanner scanner = new java.util.Scanner(System.in);
+                    if (scanner.hasNextLine()) {
+                        line = scanner.nextLine();
+                    }
+                } catch (Exception e) {
+                }
+            }
+
+            if (line != null && line.trim().toLowerCase().startsWith("m")) doMerge = true;
+            else if (line != null && line.trim().toLowerCase().startsWith("o")) doOverwrite = true;
+            else if (line != null && line.trim().toLowerCase().startsWith("s")) return;
+            else {
+
                 doOverwrite = true;
             }
         }
@@ -159,22 +170,27 @@ public class Converter implements Callable<Integer> {
         if (doMerge) {
             try {
                 CompilationUnit existingCU = StaticJavaParser.parse(outputFile);
-
                 // Merge IMPORTS
                 existingCU.getImports().forEach(im -> {
                     if (!benchmark.getImports().contains(im)) benchmark.addImport(im);
                 });
 
+                //check if the main type (class/interface) is the same, otherwise we cannot merge
                 TypeDeclaration<?> newType = benchmark.getTypes().get(0);
                 TypeDeclaration<?> existingType = existingCU.getTypes().stream()
                         .filter(t -> t.getNameAsString().equals(newType.getNameAsString()))
                         .findFirst().orElse(null);
 
+
+
+                // control that both types are class or interface declarations, otherwise we cannot merge
                 if (existingType != null && existingType.isClassOrInterfaceDeclaration() && newType.isClassOrInterfaceDeclaration()) {
+
+                    //convert to ClassOrInterfaceDeclaration
                     ClassOrInterfaceDeclaration existingCid = existingType.asClassOrInterfaceDeclaration();
                     ClassOrInterfaceDeclaration newCid = newType.asClassOrInterfaceDeclaration();
 
-                    // find benchmark_ methods
+                    // merge OUTER class methods
                     mergeMethods(existingCid, newCid);
 
                     // find inner class named _Benchmark
@@ -190,6 +206,7 @@ public class Converter implements Callable<Integer> {
                                         .filter(newInner -> newInner.getNameAsString().equals("_Benchmark"))
                                         .findFirst()
                                         .ifPresent(newInner -> {
+                                            //MERGE INNER class methods _BENCHMARK
                                             mergeMethods(existingInner, newInner);
                                         });
                             });
@@ -282,16 +299,14 @@ public class Converter implements Callable<Integer> {
         Map<String, CompilationUnit> suite = benchmarkSuiteBuilder.buildSuite();
 
 
-        // if there's --strict we check that for the classes where the user requested
-        if (strict && !explicitlyRequestedMethods.isEmpty()) {
+        if (!explicitlyRequestedMethods.isEmpty()) {
             for (Map.Entry<String, List<String>> e : explicitlyRequestedMethods.entrySet()) {
                 String className = e.getKey();
                 boolean foundBenchmarksForClass = false;
                 CompilationUnit generated = suite.get(className);
+
                 if (generated != null) {
-                    // find inner classes with methods starting with 'benchmark_'
                     for (TypeDeclaration<?> type : generated.getTypes()) {
-                        // Check main class to find methods benchmark_
                         List<MethodDeclaration> methods = type.findAll(MethodDeclaration.class);
                         for (MethodDeclaration md : methods) {
                             if (md.getNameAsString().startsWith("benchmark_")) {
@@ -299,9 +314,7 @@ public class Converter implements Callable<Integer> {
                                 break;
                             }
                         }
-                        if (foundBenchmarksForClass) {
-                            break;
-                        }
+                        if (foundBenchmarksForClass) break;
                     }
                 }
                 if (!foundBenchmarksForClass) {
@@ -331,21 +344,51 @@ public class Converter implements Callable<Integer> {
     }
 
 
+
     private void generateJUBenchmarks()
             throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository =
                 new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
         WrapperBenchmarkFactory benchmarkFactory = new WrapperBenchmarkFactory(repository);
         List<CompilationUnit> benchmarks = new ArrayList<>(classNames.size());
+
         for (String className : classNames) {
+
+            if (className.contains("#")) {
+                String[] parts = className.split("#");
+                String baseClassName = parts[0];
+                String[] requestedMethods = parts[1].split(",");
+
+                // get source of the class
+                TypeDeclaration<?> testClassSource = repository.findClass(baseClassName).getSource();
+
+                // extract method names from the source
+                Set<String> actualMethodsInSource = testClassSource.findAll(MethodDeclaration.class)
+                        .stream()
+                        .map(MethodDeclaration::getNameAsString)
+                        .collect(Collectors.toSet());
+
+                // Validate that all requested methods are present in the source
+                for (String requested : requestedMethods) {
+                    String trimmedRequested = requested.trim();
+                    if (!actualMethodsInSource.contains(trimmedRequested)) {
+                        throw new InvalidInputClassException(
+                                "\n[ERRORE] Metodo '" + trimmedRequested +
+                                        "' non trovato nella classe " + baseClassName);
+                    }
+                }
+            }
+
             try {
                 benchmarks.add(benchmarkFactory.createBenchmarkFromTest(className));
             } catch (BenchmarkGenerationException e) {
                 if (!ignoreFailures) {
                     throw e;
                 }
+                System.err.println("[WARNING] Skipping " + className + " due to conversion error: " + e.getMessage());
             }
         }
+
         for (CompilationUnit benchmark : benchmarks) {
             TypeDeclaration<?> benchmarkClass = benchmark.getTypes().get(0);
             String benchmarkClassName = benchmarkClass.getFullyQualifiedName().orElseThrow();
@@ -354,6 +397,7 @@ public class Converter implements Callable<Integer> {
             writeSourceCodeToFile(benchmark, outputFile);
         }
     }
+
 
     private static void loadMissingCompilationUnits(
             String packageName, File file, InputClassRepository repository,

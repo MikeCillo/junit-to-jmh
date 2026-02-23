@@ -7,8 +7,8 @@ plugins {
 
 
 repositories {
-    mavenLocal()    // Cerca in ~/.m2/repository (dove è AMBER)
-    mavenCentral()  // Poi cerca online
+    mavenLocal()
+    mavenCentral()
 }
 
 jacoco {
@@ -34,7 +34,6 @@ pitest {
 dependencies {
     val javaparserVersion: String by rootProject.extra
     val jUnitJupiterVersion: String by rootProject.extra
-    // val jmhVersion: String by rootProject.extra  <-- NON USIAMO PIÙ QUELLA STANDARD
 
     val bcelVersion: String by rootProject.extra
     val jUnit4Version: String by rootProject.extra
@@ -43,7 +42,6 @@ dependencies {
     implementation("info.picocli", "picocli", "4.6.3")
     implementation("com.github.javaparser", "javaparser-core", "3.25.10")
 
-    // 3 Usiamo la versione di AMBER installata localmente
     implementation("org.openjdk.jmh:jmh-core:1.37")
 
     implementation("org.apache.bcel", "bcel", bcelVersion)
@@ -51,7 +49,7 @@ dependencies {
     implementation("com.google.guava", "guava", "31.1-jre")
     implementation("org.freemarker", "freemarker", "2.3.31")
     implementation("commons-io", "commons-io", "2.11.0")
-    implementation("org.junit.jupiter:junit-jupiter:5.10.0") // aggiunta per eseguire i test con JUnit 5
+    implementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", jUnitJupiterVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-params", jUnitJupiterVersion)
     testImplementation("org.hamcrest", "hamcrest-library", "2.2")
@@ -63,11 +61,18 @@ dependencies {
 
 application {
     mainClass.set("se.chalmers.ju2jmh.Converter")
+
 }
+
+
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
     finalizedBy("jacocoTestReport")
+}
+
+tasks.named<JavaExec>("run") {
+    standardInput = System.`in`
 }
 
 tasks.named<JacocoReport>("jacocoTestReport") {
