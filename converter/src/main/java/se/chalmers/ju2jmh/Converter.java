@@ -503,7 +503,7 @@ public class Converter implements Callable<Integer> {
     }
 
 
-    //  HELPER PER IL BACKUP
+    //  HELPER BACKUP
     private void createBackup(File file) {
         try {
             Path backupPath = Path.of(file.getAbsolutePath() + ".bak");
