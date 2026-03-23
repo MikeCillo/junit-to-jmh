@@ -81,26 +81,87 @@ When working with a large number of tests, it is easier to provide a plaintext f
 ./gradlew :converter:run --args="... --class-names-file=/path/to/test-classes.txt"
 ```
 
-### 5. End-to-End Example
-Assuming you have a Gradle project at /tmp/my-project, here is how you might set up variables and run a targeted, safe conversion:
+### 5. 💻 Usage Scenarios
+
+To make these examples easy to read and run, let's assume you have exported your project paths as environment variables in your terminal:
 
 ```bash
-# 1. Define Paths
-SRC="/tmp/my-project/src/test/java"
-BIN="/tmp/my-project/build/classes/java/test"
-OUT="/tmp/my-project/src/jmh/java"
-
-# 2. Run the tool to convert specific methods using the Wrapper approach, 
-# auto-merging if the file exists.
-./gradlew :converter:run --args="$SRC $BIN $OUT \
-com.example.integration.DatabaseTest#testConnection,testQuery \
---ju-runner-benchmark \
---on-conflict merge"
+export SRC="/tmp/my-project/src/test/java"
+export BIN="/tmp/my-project/build/classes/java/test"
+export OUT="/tmp/my-project/src/jmh/java"
 ```
 
-Once generated, you can build and run your JMH benchmarks using the standard JMH Gradle/Maven plugins:
+#### 5.1 Converting Entire Classes
+Pass one or more fully-qualified class names. The tool will parse the AST and convert all valid @Test methods found inside them.
 
 ```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT \
+    com.example.math.AdditionTest \
+    com.example.math.SubtractionTest"
+```
+
+#### 5.2 Targeting Specific Methods
+Use the # separator followed by a comma-separated list of methods to extract only the tests you care about. The Fail-Fast validation will ensure these methods actually exist before doing any work.
+
+```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT \
+    com.example.math.AdditionTest#testAddPositiveNumbers,testAddZero"
+```
+
+#### 5.3 Mixed Conversion (Classes + Methods)
+You can mix and match entire classes and specific methods in a single execution. You can also apply the --ju-runner-benchmark flag to use the Wrapper strategy for complex tests.
+
+```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT \
+    com.example.math.AdditionTest \
+    com.example.math.SubtractionTest#testSubtractPositive \
+    --ju-runner-benchmark"
+```
+
+#### 5.4 Handling File Conflicts (--on-conflict)
+If the generated benchmark file already exists, the tool relies on the --on-conflict policy to prevent accidental data loss. A .bak backup is automatically created upon modification.
+Interactive Mode (Default - ask): Pauses execution and asks for user input. Best for local development.
+
+```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT com.example.MyTest"
+# Terminal prompt: File MyTest.java has CHANGED. Choose: [o]verwrite, [m]erge, [s]kip:
+```
+
+* **Merge Mode (merge)**: Intelligently merges new benchmark methods into the existing file. Existing benchmarks (or manually added JMH state variables) are kept intact. Best for iterative benchmark development.
+
+ ```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT com.example.MyTest --on-conflict merge"
+ ```
+
+* **Overwrite Mode (overwrite)**:
+Silently overwrites the existing file. Ideal for automated CI/CD pipelines.
+
+ ```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT com.example.MyTest --on-conflict overwrite"
+ ```
+
+* **Skip Mode (skip)**:
+Silently skips the generation if the file already exists. Useful when processing large batches of tests where you only want to generate missing benchmarks without touching existing ones.
+ ```bash
+./gradlew :converter:run --args="$SRC $BIN $OUT com.example.MyTest --on-conflict skip"
+ ```
+
+#### 5.5 Automatic Backups (.bak)
+Whenever an existing file is modified via the merge or overwrite policies, the tool automatically preserves the original state by generating a .bak file in the same output directory. Zero data loss guaranteed.
+
+ ```bash
+# Check the output directory after a merge/overwrite operation:
+ls -l $OUT/com/example/
+
+# Expected output:
+# MyTest_JU5Benchmark.java
+# MyTest_JU5Benchmark.java.bak
+ ```
+
+#### 5.6 Compiling and Running Benchmarks
+Once generated, you can build and run your JMH benchmarks using the standard JMH Gradle/Maven plugins:
+```bash
+
 cd /tmp/my-project
 ./gradlew jmhJar
 java -jar build/libs/my-project-jmh.jar -wi 3 -i 5 -f 1
