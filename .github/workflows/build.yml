@@ -1,0 +1,33 @@
+name: Java CI with Gradle
+
+# The pipeline triggers on every push to main, master and dependability-projexxt
+on:
+  push:
+    branches: [ "main", "master", "dependability-project" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+
+    steps:
+    # Get the souce code from repository
+      - name: Checkout source code
+        uses: actions/checkout@v4
+    # setup java 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+    # grant execute permission to Gradle wrapper
+      - name: Grant exectute permission for gradlew
+        run: chmod +x gradlew
+
+
+    # Build the project and run the test suite
+      - name: Build with Gradle
+        run: ./gradlew build
