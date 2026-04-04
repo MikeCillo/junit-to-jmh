@@ -89,6 +89,14 @@ public class InputClassRepository {
      * @throws ClassNotFoundException If the source code or bytecode for the given class name was
      * absent or could otherwise not be loaded.
      */
+
+
+    /*@ public behavior
+      @ requires name != null;
+      @ ensures \result != null;
+      @ ensures \result.getName().equals(name);
+      @ signals (ClassNotFoundException) true;
+      @*/
     public InputClass findClass(String name) throws ClassNotFoundException {
         InputClass inputClass = knownClasses.get(name);
         if (inputClass != null) {

@@ -27,6 +27,7 @@ public class UnitTestClass {
     private final List<TestRule> classRuleFields;
     private final List<TestRule> classRuleMethods;
 
+    /*@ public instance invariant this.name != null @*/
     private UnitTestClass(String name,
             UnitTestClass superclass,
             List<UnitTest> tests,
