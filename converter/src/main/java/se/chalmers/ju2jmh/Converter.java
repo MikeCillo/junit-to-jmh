@@ -250,6 +250,12 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /* @ behavior
+    @ requires this.classNames != null;
+    @ requires this.outputPath != null && this.outputPath.toFile().exists();
+    @ signals (ClassNotFoundException e) true;
+    @ signals (IOException e) true;
+    @*/
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
 
@@ -344,7 +350,12 @@ public class Converter implements Callable<Integer> {
     }
 
 
-
+    /* @ behavior
+    @ requires this.classNames != null;
+    @ requires this.outputPath != null && this.outputPath.toFile().exists();
+    @ signals (ClassNotFoundException e) true;
+    @ signals (IOException e) true;
+    @*/
     private void generateJUBenchmarks()
             throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository =
@@ -429,6 +440,12 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /* @ behavior
+    @ requires this.classNames != null;
+    @ requires this.outputPath != null && this.outputPath.toFile().exists();
+    @ signals (ClassNotFoundException e) true;
+    @ signals (IOException e) true;
+    @*/
     private void generateTailoredBenchmarks() throws ClassNotFoundException, IOException {
         InputClassRepository repository =
                 new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
@@ -475,6 +492,16 @@ public class Converter implements Callable<Integer> {
                 .map(Path::of)
                 .collect(Collectors.toUnmodifiableList());
     }
+
+
+
+    /*@ public normal_behavior
+      @ requires true;
+      @ ensures \result == 0;
+      @ assignable classNames, classNamesFile;
+      @ signals (FileNotFoundException e) !outputPath.toFile().exists();
+      @   signals (IOException e) (classNamesFile != null && !classNamesFile.toFile().exists());
+     */
 
     @Override
     public Integer call() throws ClassNotFoundException, IOException, InvalidInputClassException {
