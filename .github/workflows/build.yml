@@ -44,6 +44,9 @@ jobs:
           path: '**/build/libs/*.jar'
 
 
+      - name: Copy Dependencies to a single folder
+        run: ./gradlew :converter:dependencies --write-locks || true && ./gradlew copyDependencies || true
+
       - name: Download OpenJML (Linux)
         run: |
           wget https://github.com/OpenJML/OpenJML/releases/download/21-0.23/openjml-ubuntu-22.04-21-0.23.zip -O openjml.zip
@@ -51,4 +54,10 @@ jobs:
 
       - name: Verify JML Contracts
         run: |
-          ./openjml_tool/openjml -esc -cp "converter/build/classes/java/main:libs/*" converter/src/main/java/se/chalmers/ju2jmh/Converter.java
+          # Diciamo a Gradle di mettere tutte le librerie in converter/build/libs/deps (aggiungi questo task al volo)
+          mkdir -p converter/build/libs/deps
+          ./gradlew :converter:copyDependencies || echo "Usa il classpath di Gradle"
+          
+          # Ora lanciamo OpenJML usando il classpath dinamico generato da Gradle!
+          JML_CP=$(./gradlew -q :converter:printClasspath)
+          ./openjml_tool/openjml -esc -cp "$JML_CP" converter/src/main/java/se/chalmers/ju2jmh/Converter.java
