@@ -34,7 +34,7 @@ jobs:
 
     # Continuous Delivery (CD) save .jar on GitHub
       - name: Upload executable artifact (CD)
-        uses: actions/upload artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: ju2jmh-executable
           path: build/libs/*.jar
