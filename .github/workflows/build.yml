@@ -42,3 +42,13 @@ jobs:
         with:
           name: ju2jmh-executable
           path: '**/build/libs/*.jar'
+
+
+      - name: Download OpenJML (Linux)
+        run: |
+          wget https://github.com/OpenJML/OpenJML/releases/download/21-0.23/openjml-ubuntu-22.04-21-0.23.zip -O openjml.zip
+          unzip openjml.zip -d openjml_tool
+
+      - name: Verify JML Contracts
+        run: |
+          ./openjml_tool/openjml -esc -cp "converter/build/classes/java/main:libs/*" converter/src/main/java/se/chalmers/ju2jmh/Converter.java
