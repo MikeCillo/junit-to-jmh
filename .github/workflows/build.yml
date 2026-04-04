@@ -31,3 +31,10 @@ jobs:
     # Build the project and run the test suite
       - name: Build with Gradle
         run: ./gradlew build
+
+    # Continuous Delivery (CD) save .jar on GitHub
+      - name: Upload executable artifact (CD)
+        uses: actions/upload artifact@v4
+        with:
+          name: ju2jmh-executable
+          path: build/libs/*.jar
