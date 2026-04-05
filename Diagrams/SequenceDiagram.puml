@@ -1,54 +1,70 @@
 @startuml
-title Sequence Diagram - Flusso di Conversione (Standard JUnit 4)
+title Sequence Diagram - ju2jmh Full Conversion Flow
 autonumber
 
 actor User
 participant "Converter" as C
-participant "JU4BenchmarkFactory" as F
 participant "InputClassRepository" as R
+participant "Benchmark Factory / Builder" as F
 participant "File System" as FS
 
 User -> C : main(args)
 activate C
-
+C -> C : setLanguageLevel(JAVA_17)
 C -> C : call()
-note right: Entry point PicoCLI
+note right of C: JML @requires outputPath exists
 
-C -> C : generateJU4Benchmarks()
-activate C
+' Inizializzazione Repository Condiviso
+C -> R : new InputClassRepository(sourcePath, classPath)
+activate R
+R --> C : repository instance
+deactivate R
 
-    ' Creazione Repository
-    C -> R : new(sourcePath, classPath)
+alt --ju-runner-benchmark
+    C -> C : generateJUBenchmarks()
+    C -> F : new WrapperBenchmarkFactory(repository)
+    note right of C: [Includes Fail-Fast Method Validation]
+else --tailored-benchmark
+    C -> C : generateTailoredBenchmarks()
+    C -> F : [Uses TailoredBenchmarkFactory]
+else default
+    C -> C : generateNestedBenchmarks()
+    C -> F : new NestedBenchmarkSuiteBuilder(repository)
+end
 
-    ' Creazione Factory
-    C -> F : new(repository)
+loop For each target class
+    C -> F : create / build benchmark
+    activate F
+    note right of F: e.g. WrapperBenchmarkFactory\n(JML @requires className != null)
 
-    loop per ogni "className" nella lista input
-        C -> F : createBenchmarkFromTest(className)
-        activate F
+    ' Ast & Bytecode Fetching
+    F -> R : findClass(className)
+    activate R
+    note right of R: JML protected
+    R -> FS : Read .class and .java files
+    R -> R : Parse Bytecode (BCEL)\nParse AST (JavaParser)
+    R --> F : InputClass
+    deactivate R
 
-        ' 1. Recupero Input
-        F -> R : findClass(className)
-        activate R
-        R --> F : InputClass (Bytecode + Source)
-        deactivate R
+    ' Model Generation
+    F -> F : filterAndGenerate(methods)
+    F --> C : CompilationUnit (New Benchmark AST)
+    deactivate F
 
-        ' 2. Analisi Metodi
-        F -> F : findTestMethods(bytecode)
-        note right: Recupera tutti i metodi @Test.\n(Punto di intervento per CR #3)
-
-        ' 3. Generazione Codice
-        F -> F : generateBenchmark(packageName, methods...)
-        note right: Crea la CompilationUnit clonando i template.\n(Punto di intervento per CR #2 - AMBER)
-
-        F --> C : CompilationUnit (Benchmark Generato)
-        deactivate F
-
-        ' 4. Scrittura su Disco
-        C -> FS : writeSourceCodeToFile(compilationUnit)
+    ' Output & Conflict Resolution Phase
+    C -> C : writeSourceCodeToFile(compilationUnit)
+    activate C
+    C -> FS : check if exists()
+    alt File does not exist / Overwrite
+        C -> FS : Write to file
+    else Merge
+        C -> FS : Read existing file
+        C -> C : mergeMethods(existing, new)
+        note right of C: JML protected merge
+        C -> FS : Write merged AST
     end
+    deactivate C
+end
 
 deactivate C
-deactivate C
-
 @enduml

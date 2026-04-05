@@ -168,12 +168,12 @@ public class WrapperBenchmarkFactory {
     }
 
 
-    /* @ public behavior
+    /*@ public behavior
       @ requires testClassName != null;
       @ requires this.repository != null;
       @ ensures \result != null;
       @ signals (ClassNotFoundException | InvalidInputClassException) true;
-     */
+      @*/
 
     public CompilationUnit createBenchmarkFromTest(String testClassName)
             throws ClassNotFoundException, InvalidInputClassException {

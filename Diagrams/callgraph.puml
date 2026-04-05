@@ -1,0 +1,60 @@
+@startuml
+skinparam rectangle {
+    BackgroundColor LightBlue
+    BorderColor DarkBlue
+    BackgroundColor<<JML>> LightGreen
+}
+
+title Call Graph - ju2jmh (Current Architecture & JML Core Methods)
+
+rectangle "Converter\nmain(args)" as main
+rectangle "StaticJavaParser\nsetLanguageLevel(JAVA_17)" as parserInit
+
+rectangle "Converter\ncall()" as call <<JML>>
+
+rectangle "Converter\ngenerateJUBenchmarks()" as genJU <<JML>>
+rectangle "Converter\ngenerateTailoredBenchmarks()" as genTailored <<JML>>
+rectangle "Converter\ngenerateNestedBenchmarks()" as genNested <<JML>>
+
+rectangle "WrapperBenchmarkFactory\ncreateBenchmarkFromTest()" as wrapperFactory <<JML>>
+rectangle "TailoredBenchmarkFactory\ngenerateBenchmarkClass()" as tailoredFactory
+rectangle "NestedBenchmarkSuiteBuilder\nbuildSuite()" as nestedFactory
+
+rectangle "InputClassRepository\nfindClass()" as findClass <<JML>>
+rectangle "InputClassRepository\n[Bytecode & AST Parsing]" as bcelParser
+
+main --> parserInit : "1. Configures Parser"
+main --> call : "2. Executes CLI"
+
+call --> genJU : "[if --ju-runner-benchmark]"
+call --> genTailored : "[if --tailored-benchmark]"
+call --> genNested : "[default]"
+
+' JU Branch
+genJU --> findClass : "Validates requested\nmethods (Fail-Fast)"
+genJU --> wrapperFactory : "Delegates Generation"
+wrapperFactory --> findClass : "Reads Source & Bytecode"
+
+' Tailored Branch
+genTailored --> tailoredFactory : "Delegates Generation"
+tailoredFactory --> findClass : "Reads Source & Bytecode"
+
+' Nested Branch
+genNested --> nestedFactory : "Builds Suite"
+nestedFactory --> findClass : "Reads Source & Bytecode"
+
+' Storage Layer
+findClass --> bcelParser : "Delegates to BCEL\nand JavaParser"
+
+note top of call
+  <b>JML Entry Point</b>
+  Validates I/O paths
+end note
+
+note bottom of findClass
+  <b>JML Protected Node</b>
+  @requires className != null
+  @ensures result exactly matches
+end note
+
+@enduml

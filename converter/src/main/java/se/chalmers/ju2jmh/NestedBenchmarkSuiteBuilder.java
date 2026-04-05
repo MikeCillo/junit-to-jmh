@@ -150,7 +150,7 @@ public class NestedBenchmarkSuiteBuilder {
             if (methods != null && !methods.isEmpty()) {
                 this.classSpecificTargetMethods.put(className, methods);
             } else {
-                // null significa "tutti i metodi"
+                // null means all methods
                 this.classSpecificTargetMethods.put(className, null);
             }
         }
