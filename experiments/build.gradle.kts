@@ -2,6 +2,12 @@ plugins {
     java
 }
 
+configurations.all {
+    resolutionStrategy {
+        force("org.apache.commons:commons-lang3:3.18.0")
+    }
+}
+
 dependencies {
     implementation(project(":converter"))
     implementation("com.github.javaparser:javaparser-core:3.25.5")

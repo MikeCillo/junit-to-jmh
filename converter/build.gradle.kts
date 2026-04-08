@@ -3,6 +3,7 @@ plugins {
     application
     jacoco
     id("info.solidsoft.pitest") version "1.15.0"
+    id ("org.sonarqube") version "3.5.0.2730"
 }
 
 
@@ -31,6 +32,12 @@ pitest {
     verbose.set(true)
 }
 
+configurations.all {
+    resolutionStrategy {
+        force("org.apache.commons:commons-lang3:3.18.0")
+    }
+}
+
 dependencies {
     val javaparserVersion: String by rootProject.extra
     val jUnitJupiterVersion: String by rootProject.extra
@@ -46,15 +53,16 @@ dependencies {
 
     implementation("org.apache.bcel", "bcel", bcelVersion)
     implementation("junit", "junit", jUnit4Version)
-    implementation("com.google.guava", "guava", "31.1-jre")
+    implementation("com.google.guava", "guava", "33.0.0-jre")
     implementation("org.freemarker", "freemarker", "2.3.31")
-    implementation("commons-io", "commons-io", "2.11.0")
+    implementation("commons-io", "commons-io", "2.15.1")
     implementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", jUnitJupiterVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-params", jUnitJupiterVersion)
     testImplementation("org.hamcrest", "hamcrest-library", "2.2")
     testImplementation("io.github.java-diff-utils", "java-diff-utils", "4.12")
     testImplementation(project(":converter:test-input-classes"))
+    testAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
 
     testRuntimeOnly("org.junit.jupiter", "junit-jupiter-engine", jUnitJupiterVersion)
 }
@@ -78,8 +86,18 @@ tasks.named<JavaExec>("run") {
 tasks.named<JacocoReport>("jacocoTestReport") {
     dependsOn(tasks.named("test"))
     reports {
-        xml.required.set(false)
+        xml.required.set(true)
         csv.required.set(false)
         html.required.set(true)
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "junit-to-jmh")
+        property("sonar.projectName", "junit-to-jmh")
+        property("sonar.host.url", "http://localhost:9000")
+        property("sonar.coverage.jacoco.xmlReportPaths", "${buildDir}/reports/jacoco/test/jacocoTestReport.xml",
+            "build/reports/jacoco/test/jacocoTestReport.xml")
     }
 }

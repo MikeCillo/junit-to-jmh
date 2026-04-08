@@ -17,7 +17,7 @@ dependencies {
     implementation("junit:junit:4.13.2")
     runtimeOnly("org.junit.vintage:junit-vintage-engine:5.10.1")
 
-    implementation("org.apache.commons:commons-lang3:3.14.0")
+    implementation("org.apache.commons:commons-lang3:3.18.0")
 }
 
 jmh {
