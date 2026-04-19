@@ -1,19 +1,22 @@
 package se.chalmers.ju2jmh.testinput.unittests.junit5;
 
 import org.junit.jupiter.api.Test;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
 
 public class HeavyCalculationTest {
 
     @Test
+    @SuppressWarnings("java:S106")
     public void testSortLargeList() {
 
-        List<Integer> numbers = new Random().ints(10_000).boxed().collect(Collectors.toList());
+        List<Integer> numbers = java.util.concurrent.ThreadLocalRandom.current()
+                .ints(10_000)
+                .boxed()
+                .collect(Collectors.toList());
 
         //benchmarking the sorting of a large list
         Collections.sort(numbers);

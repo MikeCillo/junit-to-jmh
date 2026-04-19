@@ -97,7 +97,6 @@ sonar {
         property("sonar.projectKey", "junit-to-jmh")
         property("sonar.projectName", "junit-to-jmh")
         property("sonar.host.url", "http://localhost:9000")
-        property("sonar.coverage.jacoco.xmlReportPaths", "${buildDir}/reports/jacoco/test/jacocoTestReport.xml",
-            "build/reports/jacoco/test/jacocoTestReport.xml")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
     }
 }

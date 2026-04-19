@@ -9,12 +9,13 @@ public class ExceptionLogicTest {
     @Test
     public void testExpectedException() {
         Assertions.assertThrows(NumberFormatException.class, () -> {
-            Integer.parseInt("Non è un numero");
+           int result = Integer.parseInt("not a number");
+           Assertions.fail("Expected NumberFormatException was not thrown, got result: " + result);
         });
     }
 
     @Test
     public void testNoException() {
-        Integer.parseInt("12345");
+        Assertions.assertEquals(12345, Integer.parseInt("12345"), "Expected parsing to succeed without exceptions");
     }
 }

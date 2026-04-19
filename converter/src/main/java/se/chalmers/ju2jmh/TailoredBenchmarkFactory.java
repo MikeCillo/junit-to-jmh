@@ -152,11 +152,14 @@ public class TailoredBenchmarkFactory {
             boolean superFirst) {
         Stream<Member<M>> members = getMembers.apply(testClass)
                 .map(m -> new Member<>(m, testClass.name()));
-        if (testClass.superclass().isEmpty()) {
+
+        var optionalSuperclass = testClass.superclass();
+        if (optionalSuperclass.isEmpty()) {
             return members;
         }
+
         Stream<Member<M>> superMembers =
-                extractMembers(testClass.superclass().get(), getMembers, superFirst);
+                extractMembers(optionalSuperclass.get(), getMembers, superFirst);
         return superFirst
                 ? Stream.concat(superMembers, members)
                 : Stream.concat(members, superMembers);

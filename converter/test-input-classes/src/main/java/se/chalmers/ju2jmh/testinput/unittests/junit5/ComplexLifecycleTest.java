@@ -14,7 +14,7 @@ public class ComplexLifecycleTest {
     public static void globalSetup() {
         sharedResource = new ArrayList<>();
         sharedResource.add("DB_CONFIG");
-        try { Thread.sleep(50); } catch (InterruptedException e) {}
+        try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
     @AfterAll

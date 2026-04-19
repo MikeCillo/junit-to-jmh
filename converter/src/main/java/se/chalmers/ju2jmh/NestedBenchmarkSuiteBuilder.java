@@ -102,12 +102,7 @@ public class NestedBenchmarkSuiteBuilder {
             addAbstractTestClass(superclassName);
         } catch (ClassNotFoundException e) {
         }
-        if (!benchmarkClasses.containsKey(superclassName)
-                && !abstractBenchmarkClasses.containsKey(superclassName)) {
-            abstractBenchmarkClasses.put(className, inputClass);
-        } else {
-            abstractBenchmarkClasses.put(className, inputClass);
-        }
+        abstractBenchmarkClasses.put(className, inputClass);
     }
 
     public NestedBenchmarkSuiteBuilder addTestClass(String className)
