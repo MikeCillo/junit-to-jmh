@@ -476,6 +476,15 @@ public class Converter implements Callable<Integer> {
                 .collect(Collectors.toUnmodifiableList());
     }
 
+
+    /*@ public normal_behavior
+      @ requires true;
+      @ ensures \result != 0;
+      @ assignable classNames, classNamesFile;
+      @ signals (FileNotFoundException e) !outputPath.toFile().exists();
+      @ signals (IOException) (classNamesFile != null && !classNamesFile.toFile()).exists();
+      @*/
+
     @Override
     public Integer call() throws ClassNotFoundException, IOException, InvalidInputClassException {
         if (!outputPath.toFile().exists()) {

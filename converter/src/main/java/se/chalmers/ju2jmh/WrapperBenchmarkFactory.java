@@ -57,6 +57,15 @@ public class WrapperBenchmarkFactory {
 
     private final InputClassRepository repository;
 
+
+
+
+    /*@ public bwhavior
+    @ requires testClassName != null;
+    @ ensures \result != null;
+    @ requirest this.repository != null;
+    @ signals (ClassNotFoundException | InvalidInputClassException) true;
+    @*/
     public WrapperBenchmarkFactory(InputClassRepository repository) {
         this.repository = repository;
     }
