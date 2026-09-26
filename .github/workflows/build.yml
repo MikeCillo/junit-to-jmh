@@ -50,32 +50,33 @@ jobs:
       - name: Verify JML Contracts
         run: |
           JARS=$(find ~/.gradle/caches/ -name "*.jar" | tr '\n' ':')
-          CP="converter/build/classes/java/main:$JARS"
+          # Aggiunta la cartella api/build/classes/java/main al classpath
+          CP="api/build/classes/java/main:converter/build/classes/java/main:$JARS"
           ./openjml_tool/openjml -esc -cp "$CP" converter/src/main/java/se/chalmers/ju2jmh/Converter.java || true
-          
-          
 
-              # 1. Secret Scanning (GitGuardian)
-                - name: GitGuardian Secret Scan
-                  uses: GitGuardian/ggshield-action@v1.33.0
-                  env:
-                    GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
-                    GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
-                    GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-                    GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-                    GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
-                  continue-on-error: true 
+      # --- SECURITY MECHANISMS ---
 
-              # 2. Static Application Security Testing - SAST (SonarQube)
-                - name: SonarQube Security Analysis
-                  run: ./gradlew sonar -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-                  continue-on-error: true 
+      # 1. Secret Scanning (GitGuardian)
+      - name: GitGuardian Secret Scan
+        uses: GitGuardian/ggshield-action@v1.33.0
+        env:
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+        continue-on-error: true
 
-              # 3. Software Composition Analysis - SCA (Snyk Vulnerability Scan)
-                - name: Run Snyk to check for vulnerabilities
-                  uses: snyk/actions/setup@master
-                - name: Snyk Monitor
-                  run: snyk monitor --all-projects
-                  env:
-                    SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-                  continue-on-error: true
+      # 2. Static Application Security Testing - SAST (SonarQube)
+      - name: SonarQube Security Analysis
+        run: ./gradlew sonar -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+
+      # 3. Software Composition Analysis - SCA (Snyk Vulnerability Scan)
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/setup@master
+      - name: Snyk Monitor
+        run: snyk monitor --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true

@@ -477,14 +477,11 @@ public class Converter implements Callable<Integer> {
     }
 
 
-    /*@ public normal_behavior
-      @ requires true;
-      @ ensures \result != 0;
-      @ assignable classNames, classNamesFile;
-      @ signals (FileNotFoundException e) !outputPath.toFile().exists();
-      @ signals (IOException) (classNamesFile != null && !classNamesFile.toFile()).exists();
+    /*@ also
+      @ public behavior
+      @ ensures \result != null;
+      @ ensures \result.intValue() == 0 || \result.intValue() == 1 || \result.intValue() == 2;
       @*/
-
     @Override
     public Integer call() throws ClassNotFoundException, IOException, InvalidInputClassException {
         if (!outputPath.toFile().exists()) {
