@@ -510,6 +510,7 @@ public class Converter implements Callable<Integer> {
 
 
     //  HELPER BACKUP
+    /*@ skipesc @*/
     private void createBackup(File file) {
         try {
             Path backupPath = Path.of(file.getAbsolutePath() + ".bak");
