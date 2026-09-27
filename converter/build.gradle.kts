@@ -58,6 +58,7 @@ dependencies {
     implementation("org.freemarker", "freemarker", "2.3.35")
 
     implementation("commons-io", "commons-io", "2.15.1")
+    implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", jUnitJupiterVersion)
     testImplementation("org.junit.jupiter", "junit-jupiter-params", jUnitJupiterVersion)
