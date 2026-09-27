@@ -32,19 +32,23 @@ public class Converter implements Callable<Integer> {
     @CommandLine.Parameters(description =
             "Root path(s) of the input source files. `${sys:path.separator}` may be used as a"
                     + " separator to specify multiple directories.", index = "0")
+    /*@ nullable @*/
     private String sourcePath;
 
     @CommandLine.Parameters(description =
             "Root path(s) of the input class files. `${sys:path.separator}` may be used as a"
                     + " separator to specify multiple directories.", index = "1")
+    /*@ nullable @*/
     private String classPath;
 
     @CommandLine.Parameters(description = "Root path for the output source files.", index = "2")
+    /*@ nullable @*/
     private Path outputPath;
 
     @CommandLine.Parameters(
             description = "Fully qualified names of the classes to convert to benchmarks.",
             index = "3..*")
+    /*@ nullable @*/
     private List<String> classNames;
 
 
@@ -70,6 +74,7 @@ public class Converter implements Callable<Integer> {
     @CommandLine.Option(
             names = {"--class-names-file"},
             description = "File to load class names from.")
+    /*@ nullable @*/
     private Path classNamesFile;
 
     @CommandLine.Option(
@@ -78,6 +83,7 @@ public class Converter implements Callable<Integer> {
             split = ","
     )
 
+    /*@ nullable @*/
     private List<String> targetMethods;
 
 
