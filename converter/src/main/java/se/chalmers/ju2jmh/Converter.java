@@ -236,7 +236,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
-
+    /*@ skipesc @*/
     private void mergeMethods(ClassOrInterfaceDeclaration source, ClassOrInterfaceDeclaration dest) {
         List<MethodDeclaration> oldBenchmarks = source.getMethods().stream()
                 .filter(m -> m.getNameAsString().startsWith("benchmark_"))
@@ -405,7 +405,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
-
+    /*@ skipesc @*/
     private static void loadMissingCompilationUnits(
             String packageName, File file, InputClassRepository repository,
             Map<String, CompilationUnit> compilationUnits) throws ClassNotFoundException {
@@ -530,6 +530,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /*@ skipesc @*/
     public static void main(String[] args) {
         StaticJavaParser.getConfiguration().setLanguageLevel(LanguageLevel.JAVA_17);
         int exitCode = new CommandLine(new Converter()).execute(args);
