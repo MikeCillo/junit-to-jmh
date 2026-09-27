@@ -41,8 +41,6 @@ configurations.all {
 dependencies {
     val javaparserVersion: String by rootProject.extra
     val jUnitJupiterVersion: String by rootProject.extra
-
-    val bcelVersion: String by rootProject.extra
     val jUnit4Version: String by rootProject.extra
 
     implementation(project(":api"))
@@ -51,10 +49,14 @@ dependencies {
 
     implementation("org.openjdk.jmh:jmh-core:1.37")
 
-    implementation("org.apache.bcel", "bcel", bcelVersion)
+    // bcel updated to a 6.6.0
+    implementation("org.apache.bcel", "bcel", "6.6.0")
     implementation("junit", "junit", jUnit4Version)
     implementation("com.google.guava", "guava", "33.0.0-jre")
-    implementation("org.freemarker", "freemarker", "2.3.31")
+
+    // freemarker updated to 2.3.35
+    implementation("org.freemarker", "freemarker", "2.3.35")
+
     implementation("commons-io", "commons-io", "2.15.1")
     implementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("org.junit.jupiter", "junit-jupiter-api", jUnitJupiterVersion)
