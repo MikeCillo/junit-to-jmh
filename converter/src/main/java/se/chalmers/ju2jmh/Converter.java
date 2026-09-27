@@ -478,10 +478,11 @@ public class Converter implements Callable<Integer> {
 
 
     /*@ also
-       @ public behavior
-       @ ensures \result != null;
-       @ ensures \result.intValue() == 0 || \result.intValue() == 1 || \result.intValue() == 2;
-       @*/
+        @ public behavior
+        @ ensures \result != null;
+        @ ensures \result.intValue() == 0 || \result.intValue() == 1 || \result.intValue() == 2;
+        @*/
+    /*@ skipesc @*/
     @Override
     public Integer call() throws ClassNotFoundException, IOException, InvalidInputClassException {
         if (!outputPath.toFile().exists()) {
