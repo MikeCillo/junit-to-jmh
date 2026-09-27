@@ -101,7 +101,7 @@ public class Converter implements Callable<Integer> {
                 apiClass.getCanonicalName().replace('.', '/') + ".java");
     }
 
-
+    /*@ skipesc @*/
     private void writeSourceCodeToFile(CompilationUnit benchmark, File outputFile) throws IOException {
         outputFile.getParentFile().mkdirs();
 
@@ -256,6 +256,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /*@ skipesc @*/
     private void generateNestedBenchmarks() throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository = new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
 
@@ -350,7 +351,7 @@ public class Converter implements Callable<Integer> {
     }
 
 
-
+    /*@ skipesc @*/
     private void generateJUBenchmarks()
             throws ClassNotFoundException, IOException, InvalidInputClassException {
         InputClassRepository repository =
@@ -435,6 +436,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /*@ skipesc @*/
     private void generateTailoredBenchmarks() throws ClassNotFoundException, IOException {
         InputClassRepository repository =
                 new InputClassRepository(toPaths(sourcePath), toPaths(classPath));
@@ -476,6 +478,7 @@ public class Converter implements Callable<Integer> {
         }
     }
 
+    /*@ skipesc @*/
     private static List<Path> toPaths(String pathString) {
         return Arrays.stream(pathString.split(File.pathSeparator))
                 .map(Path::of)
