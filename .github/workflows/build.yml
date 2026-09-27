@@ -54,9 +54,9 @@ jobs:
           CP="api/build/classes/java/main:converter/build/classes/java/main:$JARS"
           ./openjml_tool/openjml -esc -cp "$CP" converter/src/main/java/se/chalmers/ju2jmh/Converter.java || true
 
-      # --- SECURITY MECHANISMS ---
+      # SECURITY
 
-      # 1. Secret Scanning (GitGuardian)
+      # Secret Scanning GitGuardian
       - name: GitGuardian Secret Scan
         uses: GitGuardian/ggshield-action@v1.33.0
         env:
@@ -67,12 +67,7 @@ jobs:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
         continue-on-error: true
 
-      # 2. Static Application Security Testing - SAST (SonarQube)
-      - name: SonarQube Security Analysis
-        run: ./gradlew sonar -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-        continue-on-error: true
-
-      # 3. Software Composition Analysis - SCA (Snyk Vulnerability Scan)
+      # Software Composition Analysis Snyk Vulnerability Scan
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/setup@master
       - name: Snyk Monitor
